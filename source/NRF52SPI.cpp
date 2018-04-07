@@ -69,7 +69,7 @@ int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx
                    uint16_t rx_length)
 {
     config();
-    DMESG("SPI Xxfr %p/%d %p/%d", p_tx_buffer, tx_length, p_rx_buffer, rx_length);
+    //DMESG("SPI Xxfr %p/%d %p/%d", p_tx_buffer, tx_length, p_rx_buffer, rx_length);
     nrf_spim_tx_buffer_set(p_spim, p_tx_buffer, tx_length);
     nrf_spim_rx_buffer_set(p_spim, p_rx_buffer, rx_length);
     nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_END);
@@ -94,10 +94,10 @@ int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx
     #endif
 
     while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END)) {        
-        fiber_sleep(1);
+        //fiber_sleep(1);
     }
 
-    DMESG("done waiting.");
+    //DMESG("done waiting.");
 
     // fiber_wait_for_event(DEVICE_ID_SPI, 3);
     return 0;
