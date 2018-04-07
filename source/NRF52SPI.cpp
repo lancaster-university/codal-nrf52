@@ -31,7 +31,7 @@ DEALINGS IN THE SOFTWARE.
 #include "nrf_nvic.h"
 
 
-#ifdef TARGET_MCU_NRF52840
+#ifdef XTARGET_MCU_NRF52840
 #define THE_SPIM NRF_SPIM3
 #define THE_IRQ SPIM3_IRQn
 #else
@@ -76,13 +76,25 @@ int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx
     nrf_spim_tx_list_disable(p_spim);
     nrf_spim_rx_list_disable(p_spim);
     nrf_spim_task_trigger(p_spim, NRF_SPIM_TASK_START);
-    nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK);
-    
-    DMESG("now wait.");
+    //nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK);
 
-    while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_ENDTX)) {
-        //wait(1);
-        //fiber_sleep(5);
+    #if 0
+    DMESG("Xrxd: %p", p_spim->RXD.PTR);
+    DMESG("X");
+    DMESG("started: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_STARTED));
+    DMESG("now wait 12.");
+
+    fiber_sleep(10);
+
+    DMESG("fr: %p", p_spim->FREQUENCY);
+
+    DMESG("end: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END));
+    DMESG("started: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_STARTED));
+    DMESG("stopped: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_STOPPED));
+    #endif
+
+    while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END)) {        
+        fiber_sleep(1);
     }
 
     DMESG("done waiting.");
@@ -123,8 +135,8 @@ void NRF52SPI::config()
                                   (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos) |
                                   (GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos) |
                                   (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos);
-    uint8_t mosi_pin = NRF_DRV_SPI_PIN_NOT_USED;
-    uint8_t miso_pin = NRF_DRV_SPI_PIN_NOT_USED;
+    uint32_t mosi_pin = 0xffffffff;
+    uint32_t miso_pin = 0xffffffff;
     if (&mosi)
     {
         mosi.setDigitalValue(0);
@@ -141,13 +153,15 @@ void NRF52SPI::config()
     nrf_spim_frequency_set(p_spim, (nrf_spim_frequency_t)freq);
     nrf_spim_configure(p_spim, (nrf_spim_mode_t)mode, NRF_SPIM_BIT_ORDER_MSB_FIRST);
     nrf_spim_orc_set(p_spim, 0);
-    nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK | NRF_SPIM_INT_STOPPED_MASK);
+    //nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK | NRF_SPIM_INT_STOPPED_MASK);
     nrf_spim_enable(p_spim);
 
     //NVIC_SetVector(IRQn, (uint32_t)irq_handler);
+    /*
     sd_nvic_SetPriority(IRQn, 7);    
     sd_nvic_ClearPendingIRQ(IRQn);
     sd_nvic_EnableIRQ(IRQn);
+    */
 
     DMESG("SPI config done f=%p", freq);
 }
