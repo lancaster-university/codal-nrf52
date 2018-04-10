@@ -30,17 +30,21 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalFiber.h"
 #include "nrf_nvic.h"
 
-
 #ifdef XTARGET_MCU_NRF52840
 #define THE_SPIM NRF_SPIM3
 #define THE_IRQ SPIM3_IRQn
+#define THE_HANDLER SPIM3_IRQHandler_v
 #else
 #define THE_SPIM NRF_SPIM0
 #define THE_IRQ SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn
+#define THE_HANDLER SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler_v
 #endif
 
 namespace codal
 {
+
+// in future, we might need once instance per SPIM instance (up to 4)
+static NRF52SPI *instance;
 
 /**
  * Constructor.
@@ -53,53 +57,59 @@ NRF52SPI::NRF52SPI(Pin &mosi, Pin &miso, Pin &sclk)
     configured = 0;
     setFrequency(1000000);
     setMode(0);
+    instance = this;
+    doneHandler = NULL;
 }
 
-extern "C" void SPIM3_IRQHandler_v()
+extern "C" void THE_HANDLER()
 {
-    DMESG("IRQ");
     if (nrf_spim_event_check(THE_SPIM, NRF_SPIM_EVENT_END))
     {
         nrf_spim_event_clear(THE_SPIM, NRF_SPIM_EVENT_END);
+        instance->_irqDoneHandler();
+    }
+}
+
+void NRF52SPI::_irqDoneHandler()
+{
+    if (doneHandler)
+    {
+        PVoidCallback done = doneHandler;
+        doneHandler = NULL;
+        done(doneHandlerArg);
+    }
+    else
+    {
         Event(DEVICE_ID_SPI, 3);
     }
 }
 
 int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx_buffer,
-                   uint16_t rx_length)
+                   uint16_t rx_length, PVoidCallback doneHandler, void *arg)
 {
     config();
-    //DMESG("SPI Xxfr %p/%d %p/%d", p_tx_buffer, tx_length, p_rx_buffer, rx_length);
     nrf_spim_tx_buffer_set(p_spim, p_tx_buffer, tx_length);
     nrf_spim_rx_buffer_set(p_spim, p_rx_buffer, rx_length);
     nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_END);
     nrf_spim_tx_list_disable(p_spim);
     nrf_spim_rx_list_disable(p_spim);
-    nrf_spim_task_trigger(p_spim, NRF_SPIM_TASK_START);
-    //nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK);
 
-    #if 0
-    DMESG("Xrxd: %p", p_spim->RXD.PTR);
-    DMESG("X");
-    DMESG("started: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_STARTED));
-    DMESG("now wait 12.");
-
-    fiber_sleep(10);
-
-    DMESG("fr: %p", p_spim->FREQUENCY);
-
-    DMESG("end: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END));
-    DMESG("started: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_STARTED));
-    DMESG("stopped: %d", nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_STOPPED));
-    #endif
-
-    while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_END)) {        
-        //fiber_sleep(1);
+    if (doneHandler == NULL)
+    {
+        fiber_wake_on_event(DEVICE_ID_SPI, 3);
+    }
+    else
+    {
+        this->doneHandler = doneHandler;
+        this->doneHandlerArg = arg;
     }
 
-    //DMESG("done waiting.");
+    nrf_spim_task_trigger(p_spim, NRF_SPIM_TASK_START);
+    nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK);
 
-    // fiber_wait_for_event(DEVICE_ID_SPI, 3);
+    if (doneHandler == NULL)
+        schedule();
+
     return 0;
 }
 
@@ -108,19 +118,44 @@ int NRF52SPI::transfer(const uint8_t *command, uint32_t commandSize, uint8_t *re
 {
     if (commandSize)
     {
-        int ret = xfer(command, commandSize, NULL, 0);
+        int ret = xfer(command, commandSize, NULL, 0, NULL, NULL);
         if (ret)
             return ret;
     }
 
     if (responseSize)
     {
-        int ret = xfer(NULL, 0, response, responseSize);
+        int ret = xfer(NULL, 0, response, responseSize, NULL, NULL);
         if (ret)
             return ret;
     }
 
     return DEVICE_OK;
+}
+
+int NRF52SPI::startTransfer(const uint8_t *command, uint32_t commandSize, uint8_t *response,
+                            uint32_t responseSize, PVoidCallback doneHandler, void *arg)
+{
+    if (doneHandler == NULL)
+        return DEVICE_INVALID_PARAMETER;
+
+    if (commandSize && responseSize)
+    {
+        // both command and response, fallback to slow mode
+        return SPI::startTransfer(command, commandSize, response, responseSize, doneHandler, arg);
+    }
+    else if (commandSize)
+    {
+        return xfer(command, commandSize, NULL, 0, doneHandler, arg);
+    }
+    else if (responseSize)
+    {
+        return xfer(NULL, 0, response, responseSize, doneHandler, arg);
+    }
+    else
+    {
+        return DEVICE_INVALID_PARAMETER;
+    }
 }
 
 void NRF52SPI::config()
@@ -153,15 +188,12 @@ void NRF52SPI::config()
     nrf_spim_frequency_set(p_spim, (nrf_spim_frequency_t)freq);
     nrf_spim_configure(p_spim, (nrf_spim_mode_t)mode, NRF_SPIM_BIT_ORDER_MSB_FIRST);
     nrf_spim_orc_set(p_spim, 0);
-    //nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK | NRF_SPIM_INT_STOPPED_MASK);
+    nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK | NRF_SPIM_INT_STOPPED_MASK);
     nrf_spim_enable(p_spim);
 
-    //NVIC_SetVector(IRQn, (uint32_t)irq_handler);
-    /*
-    sd_nvic_SetPriority(IRQn, 7);    
+    sd_nvic_SetPriority(IRQn, 7);
     sd_nvic_ClearPendingIRQ(IRQn);
     sd_nvic_EnableIRQ(IRQn);
-    */
 
     DMESG("SPI config done f=%p", freq);
 }
@@ -225,7 +257,7 @@ int NRF52SPI::setMode(int mode, int bits)
 int NRF52SPI::write(int data)
 {
     sendCh = data;
-    int ret = xfer(&sendCh, 1, &recvCh, 1);
+    int ret = xfer(&sendCh, 1, &recvCh, 1, NULL, NULL);
     return (ret < 0) ? (int)DEVICE_SPI_ERROR : recvCh;
 }
 }

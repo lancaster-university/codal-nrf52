@@ -50,9 +50,17 @@ class NRF52SPI : public codal::SPI
     uint8_t recvCh;
     NRF_SPIM_Type *p_spim;
 
+    PVoidCallback doneHandler;
+    void *doneHandlerArg;
+
     void config();
 
+    int xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx_buffer,
+             uint16_t rx_length, PVoidCallback doneHandler, void *arg);
+
 public:
+    void _irqDoneHandler();
+
     /**
      * Initialize SPI instance with given pins.
      *
@@ -93,17 +101,23 @@ public:
     virtual int write(int data);
 
     /**
-     * Writes a given command to SPI bus, and afterwards reads the response.
+     * Writes a given command to SPI bus, and afterwards reads the response. Waits (possibly
+     * un-scheduled) for transfer to finish.
      *
      * Note that bytes recieved while sending command are ignored.
      */
     virtual int transfer(const uint8_t *command, uint32_t commandSize, uint8_t *response,
                          uint32_t responseSize);
 
-    int xfer(uint8_t const *p_tx_buffer, uint16_t tx_buffer_length, uint8_t *p_rx_buffer,
-             uint16_t rx_buffer_length);
+    /**
+     * Writes a given command to SPI bus, and afterwards reads the response. Finally, calls
+     * doneHandler (possibly in IRQ context).
+     *
+     * Note that bytes recieved while sending command are ignored.
+     */
+    virtual int startTransfer(const uint8_t *command, uint32_t commandSize, uint8_t *response,
+                              uint32_t responseSize, PVoidCallback doneHandler, void *arg);
 };
-
 }
 
 #endif
