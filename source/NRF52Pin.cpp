@@ -92,7 +92,8 @@ int NRF52Pin::setDigitalValue(int value)
     if (!(status & IO_STATUS_DIGITAL_OUT)){
         disconnect();
 
-        nrf_gpio_cfg_output(name);
+        // Enable output mode.
+        NRF_GPIO->DIRSET = 1 << name;
 
         // Record our mode, so we can optimise later.
         status |= IO_STATUS_DIGITAL_OUT;
@@ -132,7 +133,8 @@ int NRF52Pin::getDigitalValue()
     {
         disconnect();
 
-        nrf_gpio_cfg_input(name, (nrf_gpio_pin_pull_t)pullMode);
+        // Enable input mode, and input buffer
+        NRF_GPIO->PIN_CNF[name] &= 0xfffffffc;
 
         // Record our mode, so we can optimise later.
         status |= IO_STATUS_DIGITAL_IN;
