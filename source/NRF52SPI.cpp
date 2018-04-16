@@ -34,10 +34,12 @@ DEALINGS IN THE SOFTWARE.
 #define THE_SPIM NRF_SPIM3
 #define THE_IRQ SPIM3_IRQn
 #define THE_HANDLER SPIM3_IRQHandler_v
+#define USE_SPIM3 1
 #else
 #define THE_SPIM NRF_SPIM0
 #define THE_IRQ SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn
 #define THE_HANDLER SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler_v
+#define USE_SPIM3 0
 #endif
 
 namespace codal
@@ -88,6 +90,12 @@ int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx
                    uint16_t rx_length, PVoidCallback doneHandler, void *arg)
 {
     config();
+    
+    #if !USE_SPIM3
+    if (tx_length > 255 || rx_length > 255)
+        return DEVICE_INVALID_PARAMETER;
+    #endif
+
     nrf_spim_tx_buffer_set(p_spim, p_tx_buffer, tx_length);
     nrf_spim_rx_buffer_set(p_spim, p_rx_buffer, rx_length);
     nrf_spim_event_clear(p_spim, NRF_SPIM_EVENT_END);
@@ -218,10 +226,12 @@ int NRF52SPI::setFrequency(uint32_t frequency)
         freq = NRF_DRV_SPI_FREQ_4M;
     else if (frequency <= 8000000)
         freq = NRF_DRV_SPI_FREQ_8M;
+#if USE_SPIM3
     else if (frequency <= 16000000)
         freq = (nrf_drv_spi_frequency_t)0x0A000000; // 16M
     else
         freq = (nrf_drv_spi_frequency_t)0x14000000; // 32M
+#endif
     return DEVICE_OK;
 }
 
@@ -242,7 +252,8 @@ int NRF52SPI::setFrequency(uint32_t frequency)
 int NRF52SPI::setMode(int mode, int bits)
 {
     this->mode = mode;
-    // assert(bits == 8);
+    if (bits != 8)
+        return DEVICE_INVALID_PARAMETER;
     return DEVICE_OK;
 }
 
