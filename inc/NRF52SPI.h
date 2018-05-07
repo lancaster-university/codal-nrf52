@@ -55,8 +55,8 @@ class NRF52SPI : public codal::SPI
 
     void config();
 
-    int xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx_buffer,
-             uint16_t rx_length, PVoidCallback doneHandler, void *arg);
+    int xfer(uint8_t const *p_tx_buffer, uint32_t tx_length, uint8_t *p_rx_buffer,
+             uint32_t rx_length, PVoidCallback doneHandler, void *arg);
 
 public:
     void _irqDoneHandler();
@@ -101,22 +101,20 @@ public:
     virtual int write(int data);
 
     /**
-     * Writes a given command to SPI bus, and afterwards reads the response. Waits (possibly
-     * un-scheduled) for transfer to finish.
+     * Writes and reads from the SPI bus concurrently. Waits (possibly un-scheduled) for transfer to finish.
      *
-     * Note that bytes recieved while sending command are ignored.
+     * Either buffer can be NULL.
      */
-    virtual int transfer(const uint8_t *command, uint32_t commandSize, uint8_t *response,
-                         uint32_t responseSize);
+    virtual int transfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
+                         uint32_t rxSize);
 
     /**
-     * Writes a given command to SPI bus, and afterwards reads the response. Finally, calls
-     * doneHandler (possibly in IRQ context).
+     * Writes and reads from the SPI bus concurrently. Finally, calls doneHandler (possibly in IRQ context).
      *
-     * Note that bytes recieved while sending command are ignored.
+     * Either buffer can be NULL.
      */
-    virtual int startTransfer(const uint8_t *command, uint32_t commandSize, uint8_t *response,
-                              uint32_t responseSize, PVoidCallback doneHandler, void *arg);
+    virtual int startTransfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
+                         uint32_t rxSize, PVoidCallback doneHandler, void *arg);
 };
 }
 

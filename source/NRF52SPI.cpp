@@ -30,16 +30,23 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalFiber.h"
 #include "nrf_nvic.h"
 
-#ifdef XTARGET_MCU_NRF52840
+#define USE_SPIM3 0
+
+#ifdef TARGET_MCU_NRF52840
+// SPIM3 has hardware bugs
+// #define USE_SPIM3 1
+#endif
+
+#if USE_SPIM3
 #define THE_SPIM NRF_SPIM3
 #define THE_IRQ SPIM3_IRQn
 #define THE_HANDLER SPIM3_IRQHandler_v
-#define USE_SPIM3 1
+#define SZLIMIT 0xffff
 #else
 #define THE_SPIM NRF_SPIM0
 #define THE_IRQ SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn
 #define THE_HANDLER SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler_v
-#define USE_SPIM3 0
+#define SZLIMIT 0xff
 #endif
 
 namespace codal
@@ -86,15 +93,13 @@ void NRF52SPI::_irqDoneHandler()
     }
 }
 
-int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx_buffer,
-                   uint16_t rx_length, PVoidCallback doneHandler, void *arg)
+int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint32_t tx_length, uint8_t *p_rx_buffer,
+                   uint32_t rx_length, PVoidCallback doneHandler, void *arg)
 {
     config();
     
-    #if !USE_SPIM3
-    if (tx_length > 255 || rx_length > 255)
+    if (tx_length > SZLIMIT || rx_length > SZLIMIT)
         return DEVICE_INVALID_PARAMETER;
-    #endif
 
     nrf_spim_tx_buffer_set(p_spim, p_tx_buffer, tx_length);
     nrf_spim_rx_buffer_set(p_spim, p_rx_buffer, rx_length);
@@ -121,49 +126,25 @@ int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint16_t tx_length, uint8_t *p_rx
     return 0;
 }
 
-int NRF52SPI::transfer(const uint8_t *command, uint32_t commandSize, uint8_t *response,
-                       uint32_t responseSize)
+int NRF52SPI::transfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
+                       uint32_t rxSize)
 {
-    if (commandSize)
-    {
-        int ret = xfer(command, commandSize, NULL, 0, NULL, NULL);
-        if (ret)
-            return ret;
-    }
-
-    if (responseSize)
-    {
-        int ret = xfer(NULL, 0, response, responseSize, NULL, NULL);
-        if (ret)
-            return ret;
-    }
-
-    return DEVICE_OK;
+    if (txSize <= SZLIMIT && rxSize <= SZLIMIT)
+        return xfer(txBuffer, txSize, rxBuffer, rxSize, NULL, NULL);
+    else
+        return codal::SPI::transfer(txBuffer, txSize, rxBuffer, rxSize);
 }
 
-int NRF52SPI::startTransfer(const uint8_t *command, uint32_t commandSize, uint8_t *response,
-                            uint32_t responseSize, PVoidCallback doneHandler, void *arg)
+int NRF52SPI::startTransfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
+                            uint32_t rxSize, PVoidCallback doneHandler, void *arg)
 {
     if (doneHandler == NULL)
         return DEVICE_INVALID_PARAMETER;
 
-    if (commandSize && responseSize)
-    {
-        // both command and response, fallback to slow mode
-        return SPI::startTransfer(command, commandSize, response, responseSize, doneHandler, arg);
-    }
-    else if (commandSize)
-    {
-        return xfer(command, commandSize, NULL, 0, doneHandler, arg);
-    }
-    else if (responseSize)
-    {
-        return xfer(NULL, 0, response, responseSize, doneHandler, arg);
-    }
+    if (txSize <= SZLIMIT && rxSize <= SZLIMIT)
+        return xfer(txBuffer, txSize, rxBuffer, rxSize, doneHandler, arg);
     else
-    {
-        return DEVICE_INVALID_PARAMETER;
-    }
+        return codal::SPI::startTransfer(txBuffer, txSize, rxBuffer, rxSize, doneHandler, arg);
 }
 
 void NRF52SPI::config()
@@ -212,26 +193,27 @@ void NRF52SPI::config()
  */
 int NRF52SPI::setFrequency(uint32_t frequency)
 {
-    if (frequency <= 125000)
-        freq = NRF_DRV_SPI_FREQ_125K;
-    else if (frequency <= 250000)
-        freq = NRF_DRV_SPI_FREQ_250K;
-    else if (frequency <= 500000)
-        freq = NRF_DRV_SPI_FREQ_500K;
-    else if (frequency <= 1000000)
-        freq = NRF_DRV_SPI_FREQ_1M;
-    else if (frequency <= 2000000)
-        freq = NRF_DRV_SPI_FREQ_2M;
-    else if (frequency <= 4000000)
-        freq = NRF_DRV_SPI_FREQ_4M;
-    else if (frequency <= 8000000)
-        freq = NRF_DRV_SPI_FREQ_8M;
 #if USE_SPIM3
-    else if (frequency <= 16000000)
+    if (frequency >= 32000000)
+        freq = (nrf_drv_spi_frequency_t)0x14000000; // 32M
+    else if (frequency >= 16000000)
         freq = (nrf_drv_spi_frequency_t)0x0A000000; // 16M
     else
-        freq = (nrf_drv_spi_frequency_t)0x14000000; // 32M
 #endif
+    if (frequency >= 8000000)
+        freq = NRF_DRV_SPI_FREQ_8M;
+    else if (frequency >= 4000000)
+        freq = NRF_DRV_SPI_FREQ_4M;
+    else if (frequency >= 2000000)
+        freq = NRF_DRV_SPI_FREQ_2M;
+    else if (frequency >= 1000000)
+        freq = NRF_DRV_SPI_FREQ_1M;
+    else if (frequency >= 500000)
+        freq = NRF_DRV_SPI_FREQ_500K;
+    else if (frequency >= 250000)
+        freq = NRF_DRV_SPI_FREQ_250K;
+    else
+        freq = NRF_DRV_SPI_FREQ_125K;
     return DEVICE_OK;
 }
 
