@@ -1,28 +1,27 @@
 #include "NRF52PWM.h"
 #include "nrf52.h"
 #include "nrf52_bitfields.h"
-#include "InterruptManager.h"
 #include "cmsis.h"
 #include "CodalDmesg.h"
 
 // Handles on the instances of this class used the three PWM modules (if present)
 static NRF52PWM *nrf52_pwm_driver[3] = { NULL };
 
-void nrf52_pwm0_irq(void) 
+void nrf52_pwm0_irq(void)
 {
     // Simply pass on to the driver component handler.
     if (nrf52_pwm_driver[0])
         nrf52_pwm_driver[0]->irq();
 }
 
-void nrf52_pwm1_irq(void) 
+void nrf52_pwm1_irq(void)
 {
     // Simply pass on to the driver component handler.
     if (nrf52_pwm_driver[1])
         nrf52_pwm_driver[1]->irq();
 }
 
-void nrf52_pwm2_irq(void) 
+void nrf52_pwm2_irq(void)
 {
     // Simply pass on to the driver component handler.
     if (nrf52_pwm_driver[2])
@@ -51,8 +50,8 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     // For now, we just support a two channel grouped mode.
     // TODO: Fix this to support all modes.
     PWM.DECODER = (PWM_DECODER_LOAD_Grouped << PWM_DECODER_LOAD_Pos ) | (PWM_DECODER_MODE_RefreshCount << PWM_DECODER_MODE_Pos );
-   
-    // Configure PWM for  
+
+    // Configure PWM for
     PWM.SEQ[1].REFRESH = 0;
     PWM.SEQ[0].REFRESH = 0;
     PWM.SEQ[1].ENDDELAY = 0;
@@ -60,7 +59,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
 
     /* Enable interrupts */
     PWM.INTENSET = (PWM_INTEN_SEQEND0_Enabled << PWM_INTEN_SEQEND0_Pos )
-                |  (PWM_INTEN_SEQEND1_Enabled << PWM_INTEN_SEQEND1_Pos ); 
+                |  (PWM_INTEN_SEQEND1_Enabled << PWM_INTEN_SEQEND1_Pos );
 
     // Route an interrupt to this object
     // This is heavily unwound, but non trivial to remove this duplication given all the constants...
@@ -71,7 +70,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
         NVIC_SetVector( PWM0_IRQn, (uint32_t) nrf52_pwm0_irq );
         NVIC_SetPriority(PWM0_IRQn, 0);
         NVIC_ClearPendingIRQ(PWM0_IRQn);
-        NVIC_EnableIRQ(PWM0_IRQn); 
+        NVIC_EnableIRQ(PWM0_IRQn);
     }
 
     if (&PWM == NRF_PWM1)
@@ -80,7 +79,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
         NVIC_SetVector( PWM1_IRQn, (uint32_t) nrf52_pwm1_irq );
         NVIC_SetPriority(PWM1_IRQn, 0);
         NVIC_ClearPendingIRQ(PWM1_IRQn);
-        NVIC_EnableIRQ(PWM1_IRQn); 
+        NVIC_EnableIRQ(PWM1_IRQn);
     }
 
     if (&PWM == NRF_PWM2)
@@ -89,7 +88,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
         NVIC_SetVector( PWM2_IRQn, (uint32_t) nrf52_pwm2_irq );
         NVIC_SetPriority(PWM2_IRQn, 0);
         NVIC_ClearPendingIRQ(PWM2_IRQn);
-        NVIC_EnableIRQ(PWM2_IRQn); 
+        NVIC_EnableIRQ(PWM2_IRQn);
     }
 
     // Enable the PWM module
@@ -114,7 +113,7 @@ int NRF52PWM::getSampleRate()
  */
 int NRF52PWM::getSampleRange()
 {
-    return PWM.COUNTERTOP; 
+    return PWM.COUNTERTOP;
 }
 
 /**
@@ -127,7 +126,7 @@ int NRF52PWM::setSampleRate(int frequency)
     int prescaler = 0;
     int clock_frequency = 16000000;
 
-    // Calculate the necessary prescaler for this frequency 
+    // Calculate the necessary prescaler for this frequency
     while (prescaler <= 8)
     {
         period_ticks = (clock_frequency >> prescaler) / frequency;
@@ -191,7 +190,7 @@ int NRF52PWM::pull()
 void NRF52PWM::irq()
 {
     // once the sequence has finished playing, load up the next buffer.
-    if (PWM.EVENTS_SEQEND[0]) 
+    if (PWM.EVENTS_SEQEND[0])
     {
         if (dataReady)
             pull();
@@ -223,10 +222,10 @@ void NRF52PWM::disable()
     PWM.ENABLE = 0;
 }
 
-/** 
+/**
  * Direct output of given PWM channel to the given pin
  */
-int 
+int
 NRF52PWM::connectPin(Pin &pin, int channel)
 {
     pin.setDigitalValue(0);

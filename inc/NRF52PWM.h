@@ -3,7 +3,7 @@
 #include "Timer.h"
 #include "Pin.h"
 #include "DataStream.h"
-#include "mbed.h"
+#include "nrf52.h"
 
 #ifndef NRF52PWM_H
 #define NRF52PWM_H

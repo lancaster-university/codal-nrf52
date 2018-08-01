@@ -26,7 +26,6 @@ DEALINGS IN THE SOFTWARE.
 #include "NRF52PDM.h"
 #include "nrf52.h"
 #include "nrf52_bitfields.h"
-#include "InterruptManager.h"
 
 // Handle on the last (and probably only) instance of this class (NRF52 has only one PDM module)
 static NRF52PDM *nrf52_pdm_driver = NULL;
