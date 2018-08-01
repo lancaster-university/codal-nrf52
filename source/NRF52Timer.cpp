@@ -8,7 +8,11 @@
 
 static codal::NRF52Timer *instance = NULL;
 
-void NRF_TIMER1_irq()
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void TIMER1_IRQHandler_v()
 {
     bool isFallback = false;
 
@@ -34,7 +38,9 @@ void NRF_TIMER1_irq()
         instance->trigger();
     }
 }
-
+#ifdef __cplusplus
+}
+#endif
 
 namespace codal
 {
@@ -66,7 +72,7 @@ namespace codal
         // configure automatic clear.
         // NRF_TIMER1->SHORTS = 0;
 
-        NVIC_SetVector(TIMER1_IRQn, (uint32_t) NRF_TIMER1_irq);
+        // NVIC_SetVector(TIMER1_IRQn, (uint32_t) TIMER1_IRQHandler);
         NVIC_SetPriority(TIMER1_IRQn,0);
         NVIC_ClearPendingIRQ(TIMER1_IRQn);
         NVIC_EnableIRQ(TIMER1_IRQn);
@@ -97,12 +103,12 @@ namespace codal
      */
     void NRF52Timer::syncRequest()
     {
-        NVIC_DisableIRQ(TIMER1_IRQn);
+        __disable_irq();
         NRF_TIMER1->TASKS_CAPTURE[2] = 1;
         uint32_t snapshot = NRF_TIMER1->CC[2];
         uint32_t elapsed = snapshot - sigma;
         sigma = snapshot;
         this->sync(elapsed);
-        NVIC_EnableIRQ(TIMER1_IRQn);
+        __enable_irq();
     }
 }

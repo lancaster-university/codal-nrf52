@@ -65,6 +65,7 @@ extern uint32_t __Vectors[];
  */
 void nrf_reloc_vector_table(void)
 {
+    #if !defined(NO_BLE)
     // Copy and switch to dynamic vectors
 	uint32_t *old_vectors = (uint32_t*)VECTORS_FLASH_START;
 	uint32_t i;
@@ -73,4 +74,5 @@ void nrf_reloc_vector_table(void)
 	}
 
 	sd_softdevice_vector_table_base_set((uint32_t) nrf_dispatch_vector);
+    #endif
 }
