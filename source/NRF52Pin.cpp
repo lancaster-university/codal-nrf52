@@ -47,7 +47,7 @@ extern void set_gpio(int);
 #ifdef __cplusplus
 extern "C" {
 #endif
-void GPIOTE_IRQHandler(void)
+void GPIOTE_IRQHandler_v(void)
 {
     // new status of the GPIO registers
     volatile uint32_t inVal = NRF_P0->IN;
@@ -55,7 +55,6 @@ void GPIOTE_IRQHandler(void)
     if ((NRF_GPIOTE->EVENTS_PORT != 0) && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
     {
         NRF_GPIOTE->EVENTS_PORT = 0;
-        NRF_P0->OUTSET |= (1 << 2);
         for (uint8_t i = 0; i < 31; i++)
         {
             if (interrupt_enable & (1 << i) && irq_pins[i])
@@ -80,7 +79,6 @@ void GPIOTE_IRQHandler(void)
                 }
             }
         }
-        NRF_P0->OUTCLR |= (1 << 2);
     }
 }
 
@@ -611,6 +609,8 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE)))
     {
         getDigitalValue(pullMode);
+
+        DMESG("CFGD!!");
 
         this->obj = new PinTimeStruct;
         ((PinTimeStruct*)obj)->last_time = 0;
