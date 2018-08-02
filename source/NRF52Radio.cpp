@@ -430,6 +430,9 @@ void NRF52Radio::idleCallback()
             recv();
             delete p;
         }
+
+        // this is perhaps the wrong event to fire... will do for now.
+        Event(this->id, RADIO_EVT_DATA_READY);
     }
 }
 
