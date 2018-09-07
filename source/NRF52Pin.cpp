@@ -65,7 +65,9 @@ void GPIOTE_IRQHandler_v(void)
 
                 // lo
                 if ((((inVal >> i ) & 1) == 0) && ((NRF_P0->PIN_CNF[i] >> GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Low) == GPIO_PIN_CNF_SENSE_Low)
+                {
                     irq_pins[i]->fall();
+                }
 
                 // now enable the opposite interrupt to the one we just received to avoid repeat interrupts.
                 if (NRF_P0->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk)
@@ -142,8 +144,8 @@ void NRF52Pin::disconnect()
         NRF_P0->PIN_CNF[name] &= ~(GPIO_PIN_CNF_SENSE_Msk);
         interrupt_enable &= ~(1 << this->name);
 
-        if (obj)
-            delete ((PinTimeStruct*)obj);
+        // if (obj)
+        //     delete ((PinTimeStruct*)obj);
     }
 
     status = 0;
@@ -610,9 +612,9 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     {
         getDigitalValue(pullMode);
 
-        DMESG("CFGD!!");
+        if (!this->obj)
+            this->obj = new PinTimeStruct;
 
-        this->obj = new PinTimeStruct;
         ((PinTimeStruct*)obj)->last_time = 0;
 
         NRF_P0->PIN_CNF[name] &= ~(GPIO_PIN_CNF_SENSE_Msk);

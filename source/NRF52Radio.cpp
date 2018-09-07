@@ -326,6 +326,7 @@ int NRF52Radio::enable()
     // Configure the hardware to issue an interrupt whenever a task is complete (e.g. send/receive).
     NRF_RADIO->INTENSET = 0x00000008;
     NVIC_ClearPendingIRQ(RADIO_IRQn);
+    NVIC_SetPriority(RADIO_IRQn, 2);
     NVIC_EnableIRQ(RADIO_IRQn);
 
     NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
@@ -402,6 +403,8 @@ int NRF52Radio::setGroup(uint8_t group)
   * A background, low priority callback that is triggered whenever the processor is idle.
   * Here, we empty our queue of received packets, and pass them onto higher level protocol handlers.
   */
+
+#include "CodalDmesg.h"
 void NRF52Radio::idleCallback()
 {
     // Walk the list of packets and process each one.
@@ -431,6 +434,7 @@ void NRF52Radio::idleCallback()
             delete p;
         }
 
+        DMESG("POORECV");
         // this is perhaps the wrong event to fire... will do for now.
         Event(this->id, RADIO_EVT_DATA_READY);
     }

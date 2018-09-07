@@ -25,6 +25,7 @@ DEALINGS IN THE SOFTWARE.
 
 #include "CodalConfig.h"
 #include "NRF52Radio.h"
+#include "CodalDmesg.h"
 
 using namespace codal;
 
@@ -94,13 +95,17 @@ int NRF52RadioDatagram::recv(uint8_t *buf, int len)
 ManagedBuffer NRF52RadioDatagram::recv()
 {
     if (rxQueue == NULL)
+    {
+        DMESG("RXQ EMPTY");
         return ManagedBuffer();
+    }
 
     FrameBuffer *p = rxQueue;
     rxQueue = rxQueue->next;
 
+    DMESG("MAKING buff: %d", p->length - (NRF52_RADIO_HEADER_SIZE - 1));
     ManagedBuffer packet(p->payload, p->length - (NRF52_RADIO_HEADER_SIZE - 1));
-
+    DMESG("DONE");
     delete p;
     return packet;
 }
@@ -145,8 +150,14 @@ int NRF52RadioDatagram::send(uint8_t *buffer, int len)
   * @return DEVICE_OK on success, or DEVICE_INVALID_PARAMETER if the buffer is invalid,
   *         or the number of bytes to transmit is greater than `DEVICE_RADIO_MAX_PACKET_SIZE + DEVICE_RADIO_HEADER_SIZE`.
   */
+ #include "CodalDmesg.h"
 int NRF52RadioDatagram::send(ManagedBuffer data)
 {
+    DMESG("TXING len: %d",data.length());
+    // uint8_t *pktptr = (uint8_t*)data.getBytes();
+    // for (int i = 0; i < data.length(); i++)
+    //     DMESG("[%d]",pktptr[i]);
+
     return send((uint8_t *)data.getBytes(), data.length());
 }
 
