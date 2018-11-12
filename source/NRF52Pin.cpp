@@ -42,42 +42,36 @@ volatile uint32_t interrupt_enable = 0;
 
 static NRF52Pin *irq_pins[32];
 
-extern void set_gpio(int);
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 void GPIOTE_IRQHandler_v(void)
 {
-    // new status of the GPIO registers
-    volatile uint32_t inVal = NRF_P0->IN;
-
-    if ((NRF_GPIOTE->EVENTS_PORT != 0) && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
+    if (NRF_GPIOTE->EVENTS_PORT && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
     {
         NRF_GPIOTE->EVENTS_PORT = 0;
         for (uint8_t i = 0; i < 31; i++)
         {
             if (interrupt_enable & (1 << i) && irq_pins[i])
             {
-                // hi
-                if ((inVal >> i ) & 1 && ((NRF_P0->PIN_CNF[i] >> GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Low) != GPIO_PIN_CNF_SENSE_Low)
-                    irq_pins[i]->rise();
-
-                // lo
-                if ((((inVal >> i ) & 1) == 0) && ((NRF_P0->PIN_CNF[i] >> GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Low) == GPIO_PIN_CNF_SENSE_Low)
+                // hi: latch indicates a state change... determine if we were looking for hi or lo.
+                if ((NRF_P0->LATCH & (1 << i)) && ((NRF_P0->PIN_CNF[i] >> GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Low) != GPIO_PIN_CNF_SENSE_Low)
                 {
-                    irq_pins[i]->fall();
+                    NRF_P0->LATCH |= (1 << i);
+                    // swap!
+                    NRF_P0->PIN_CNF[i] &= ~(GPIO_PIN_CNF_SENSE_Msk);
+                    NRF_P0->PIN_CNF[i] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+                    irq_pins[i]->rise();
                 }
 
-                // now enable the opposite interrupt to the one we just received to avoid repeat interrupts.
-                if (NRF_P0->PIN_CNF[i] & GPIO_PIN_CNF_SENSE_Msk)
+                // lo: latch indicates a state change... determine if we were looking for hi or lo.
+                if ((NRF_P0->LATCH & (1 << i)) && ((NRF_P0->PIN_CNF[i] >> GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Low) == GPIO_PIN_CNF_SENSE_Low)
                 {
-                    NRF_P0->PIN_CNF[i] &= ~(GPIO_PIN_CNF_SENSE_Msk);
-
-                    if (inVal >> i & 1)
-                        NRF_P0->PIN_CNF[i] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
-                    else
+                        NRF_P0->LATCH |= (1 << i);
+                        // swap!
+                        NRF_P0->PIN_CNF[i] &= ~(GPIO_PIN_CNF_SENSE_Msk);
                         NRF_P0->PIN_CNF[i] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+                        irq_pins[i]->fall();
                 }
             }
         }
