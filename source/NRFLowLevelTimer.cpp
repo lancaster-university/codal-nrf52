@@ -58,7 +58,7 @@ extern "C" void TIMER4_IRQHandler_v()
 }
 
 #elif NRF51
-
+#error timer handler needs implementing.
 #endif
 
 // 1 channel is used to capture the timer value (channel 3 indexed from zero)
