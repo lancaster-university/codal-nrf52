@@ -10,7 +10,7 @@ list(APPEND SOURCE_FILES "source/reloc_vector_table.c")
 list(APPEND SOURCE_FILES "source/nrf_delay.c")
 list(APPEND SOURCE_FILES "source/system_nrf52.c")
 list(APPEND SOURCE_FILES "asm/CortexContextSwitch.s")
-list(APPEND SOURCE_FILES "asm/startup_NRF52832.S")
+list(APPEND SOURCE_FILES "asm/startup_NRF52832.s")
 
 # add them
 include_directories(${INCLUDE_DIRS})
