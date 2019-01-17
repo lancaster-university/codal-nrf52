@@ -1,6 +1,5 @@
 #include "ZSingleWireSerial.h"
-#include "nrf52.h"
-#include "nrf52_bitfields.h"
+#include "nrf.h"
 #include "core_cm4.h"
 #include "CodalDmesg.h"
 

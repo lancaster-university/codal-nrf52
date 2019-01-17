@@ -26,8 +26,7 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalUtil.h"
 #include "CodalDmesg.h"
 #include "NRF52Microphone.h"
-#include "nrf52.h"
-#include "nrf52_bitfields.h"
+#include "nrf.h"
 #include "cmsis.h"
 
 //

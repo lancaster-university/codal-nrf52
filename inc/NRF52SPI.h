@@ -29,7 +29,8 @@ DEALINGS IN THE SOFTWARE.
 #define CODAL_MBED_SPI_H
 
 #include "CodalConfig.h"
-#include "nrf_drv_spi.h"
+#include "hal/nrf_spi.h"
+#include "hal/nrf_spim.h"
 #include "codal-core/inc/driver-models/SPI.h"
 #include "codal-core/inc/driver-models/Pin.h"
 
@@ -44,7 +45,7 @@ class NRF52SPI : public codal::SPI
     codal::Pin &mosi;
     codal::Pin &miso;
     codal::Pin &sck;
-    nrf_drv_spi_frequency_t freq;
+    nrf_spi_frequency_t freq;
     IRQn_Type IRQn;
     uint8_t mode;
     uint8_t configured;

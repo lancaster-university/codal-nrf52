@@ -28,7 +28,7 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalDmesg.h"
 #include "codal-core/inc/types/Event.h"
 #include "CodalFiber.h"
-#include "nrf_nvic.h"
+//#include "nrf_nvic.h"
 
 #define USE_SPIM3 0
 
@@ -201,19 +201,19 @@ int NRF52SPI::setFrequency(uint32_t frequency)
     else
 #endif
     if (frequency >= 8000000)
-        freq = NRF_DRV_SPI_FREQ_8M;
+        freq = NRF_SPI_FREQ_8M;
     else if (frequency >= 4000000)
-        freq = NRF_DRV_SPI_FREQ_4M;
+        freq = NRF_SPI_FREQ_4M;
     else if (frequency >= 2000000)
-        freq = NRF_DRV_SPI_FREQ_2M;
+        freq = NRF_SPI_FREQ_2M;
     else if (frequency >= 1000000)
-        freq = NRF_DRV_SPI_FREQ_1M;
+        freq = NRF_SPI_FREQ_1M;
     else if (frequency >= 500000)
-        freq = NRF_DRV_SPI_FREQ_500K;
+        freq = NRF_SPI_FREQ_500K;
     else if (frequency >= 250000)
-        freq = NRF_DRV_SPI_FREQ_250K;
+        freq = NRF_SPI_FREQ_250K;
     else
-        freq = NRF_DRV_SPI_FREQ_125K;
+        freq = NRF_SPI_FREQ_125K;
     return DEVICE_OK;
 }
 

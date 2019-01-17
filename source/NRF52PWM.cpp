@@ -1,6 +1,5 @@
 #include "NRF52PWM.h"
-#include "nrf52.h"
-#include "nrf52_bitfields.h"
+#include "nrf.h"
 #include "cmsis.h"
 #include "CodalDmesg.h"
 
