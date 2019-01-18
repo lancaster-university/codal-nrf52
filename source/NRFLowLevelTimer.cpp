@@ -31,34 +31,36 @@ void timer_handler(uint8_t instance_number)
     instances[1]->timer_pointer(channel_bitmsk);
 }
 
-#ifdef NRF52
-extern "C" void TIMER0_IRQHandler_v()
+#if defined(NRF52832) || defined(NRF52840)
+extern "C" void TIMER0_IRQHandler()
 {
     timer_handler(0);
 }
 
-extern "C" void TIMER1_IRQHandler_v()
+extern "C" void TIMER1_IRQHandler()
 {
     timer_handler(1);
 }
 
-extern "C" void TIMER2_IRQHandler_v()
+extern "C" void TIMER2_IRQHandler()
 {
     timer_handler(2);
 }
 
-extern "C" void TIMER3_IRQHandler_v()
+extern "C" void TIMER3_IRQHandler()
 {
     timer_handler(3);
 }
 
-extern "C" void TIMER4_IRQHandler_v()
+extern "C" void TIMER4_IRQHandler()
 {
     timer_handler(4);
 }
 
-#elif NRF51
+#elif defined(NRF51)
 #error timer handler needs implementing.
+#else
+#error invalid chip
 #endif
 
 // 1 channel is used to capture the timer value (channel 3 indexed from zero)

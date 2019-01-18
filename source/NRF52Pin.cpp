@@ -61,7 +61,7 @@ static NRF52Pin *irq_pins[NUM_PINS];
 #ifdef __cplusplus
 extern "C" {
 #endif
-void GPIOTE_IRQHandler_v(void)
+void GPIOTE_IRQHandler(void)
 {
     if (NRF_GPIOTE->EVENTS_PORT && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
     {
@@ -185,8 +185,16 @@ int NRF52Pin::setDigitalValue(int value)
     {
         disconnect();
 
-        // Enable output mode.
-        PORT->DIRSET = 1 << PIN;
+        uint32_t cnf = PORT->PIN_CNF[PIN];
+        
+        // output
+        cnf |= 1;
+
+        // high drive
+        // cnf |= (3 << 8);
+        // cnf &= ~(1 << 10);
+
+        PORT->PIN_CNF[PIN] = cnf;
 
         // Record our mode, so we can optimise later.
         status |= IO_STATUS_DIGITAL_OUT;

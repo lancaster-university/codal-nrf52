@@ -17,7 +17,7 @@ ZSingleWireSerial* ZSingleWireSerial::instance = NULL;
 extern "C" {
 #endif
 
-void UARTE0_UART0_IRQHandler_v()
+void UARTE0_UART0_IRQHandler()
 {
     if (ZSingleWireSerial::instance == NULL)
     {
@@ -157,7 +157,7 @@ ZSingleWireSerial::ZSingleWireSerial(Pin& p) : DMASingleWireSerial(p)
 
     NVIC_DisableIRQ(UARTE0_UART0_IRQn);
     NVIC_SetPriority(UARTE0_UART0_IRQn, 1);
-    NVIC_SetVector(UARTE0_UART0_IRQn, (uint32_t)UARTE0_UART0_IRQHandler_v);
+    //NVIC_SetVector(UARTE0_UART0_IRQn, (uint32_t)UARTE0_UART0_IRQHandler);
     NVIC_EnableIRQ(UARTE0_UART0_IRQn);
 
     status |= DEVICE_COMPONENT_RUNNING;
