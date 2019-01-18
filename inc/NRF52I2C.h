@@ -36,8 +36,7 @@ namespace codal
  */
 class NRF52I2C : public codal::I2C
 {
-    void clearEvents();
-    int waitForStop();
+    int waitForStop(int evt);
 protected:
     NRF52Pin &sda, &scl;
 public:

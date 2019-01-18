@@ -17,12 +17,16 @@ using namespace codal;
 NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl) : codal::I2C(sda, scl), sda(sda), scl(scl)
 {
     // put pins in input mode
-    sda.getDigitalValue();
-    scl.getDigitalValue();
+    sda.getDigitalValue(PullMode::Up);
+    scl.getDigitalValue(PullMode::Up);
+
+    target_wait_us(10);
 
     nrf_twim_pins_set(THE_TWIM, scl.name, sda.name);
     nrf_twim_frequency_set(THE_TWIM, NRF_TWIM_FREQ_100K);
     nrf_twim_enable(THE_TWIM);
+
+    target_wait_us(10);
 }
 
 /** Set the frequency of the I2C interface
@@ -44,26 +48,25 @@ int NRF52I2C::setFrequency(uint32_t frequency)
     return DEVICE_OK;
 }
 
-void NRF52I2C::clearEvents()
+int NRF52I2C::waitForStop(int evt)
 {
-    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_STOPPED);
-    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_ERROR);
-    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_SUSPENDED);
-    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_LASTTX);
-    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_LASTRX);
-}
-
-int NRF52I2C::waitForStop()
-{
-    while (!nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_STOPPED))
+    int res = DEVICE_OK;
+    while (!nrf_twim_event_check(THE_TWIM, (nrf_twim_event_t)evt))
     {
         if (nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_ERROR))
         {
+            auto err = THE_TWIM->ERRORSRC;
+            THE_TWIM->ERRORSRC = err;
+            DMESG("I2C err %x", err); // 2 is address NACK
+
+            nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_ERROR);
+            nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_RESUME);
             nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_STOP);
-            return DEVICE_I2C_ERROR;
+            evt = NRF_TWIM_EVENT_STOPPED;
+            res = DEVICE_I2C_ERROR;
         }
     }
-    return DEVICE_OK;
+    return res;
 }
 
 /**
@@ -87,32 +90,25 @@ int NRF52I2C::write(uint16_t address, uint8_t *data, int len, bool repeated)
 {
     address = address >> 1;
 
-    nrf_twim_tx_buffer_set(THE_TWIM, data, len);
     nrf_twim_address_set(THE_TWIM, address);
 
+    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_STOPPED);
+    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_ERROR);
+
+    nrf_twim_tx_buffer_set(THE_TWIM, data, len);
+
     if (repeated)
+    {
         nrf_twim_shorts_set(THE_TWIM, NRF_TWIM_SHORT_LASTTX_SUSPEND_MASK);
+        nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_SUSPENDED);
+    }
     else
         nrf_twim_shorts_set(THE_TWIM, NRF_TWIM_SHORT_LASTTX_STOP_MASK);
 
-    clearEvents();
-
+    nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_RESUME);
     nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_STARTTX);
 
-    if (!repeated)
-    {
-        return waitForStop();
-    }
-    else
-    {
-        while (!nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_SUSPENDED))
-        {
-            if (nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_ERROR))
-                return DEVICE_I2C_ERROR;
-        }
-    }
-
-    return DEVICE_OK;
+    return waitForStop(repeated ? NRF_TWIM_EVENT_SUSPENDED : NRF_TWIM_EVENT_STOPPED);
 }
 
 /**
@@ -136,39 +132,30 @@ int NRF52I2C::read(uint16_t address, uint8_t *data, int len, bool repeated)
 {
     address = address >> 1;
 
-    nrf_twim_rx_buffer_set(THE_TWIM, data, len);
     nrf_twim_address_set(THE_TWIM, address);
+
+    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_STOPPED);
+    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_ERROR);
+
+    nrf_twim_rx_buffer_set(THE_TWIM, data, len);
 
     if (!repeated)
         nrf_twim_shorts_set(THE_TWIM, NRF_TWIM_SHORT_LASTRX_STOP_MASK);
 
-    auto needsResume = nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_SUSPENDED);
-
-    clearEvents();
-
+    nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_RESUME);
     nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_STARTRX);
-    if (needsResume)
-        nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_RESUME);
 
     if (!repeated)
     {
-        return waitForStop();
+        return waitForStop(NRF_TWIM_EVENT_STOPPED);
     }
     else
     {
-        auto res = DEVICE_OK;
-        while (!nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_LASTRX))
-        {
-            if (nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_ERROR))
-            {
-                res = DEVICE_I2C_ERROR;
-                break;
-            }
-        }
+        int r = waitForStop(NRF_TWIM_EVENT_LASTRX);
+        if (r != DEVICE_OK)
+            return r;
         nrf_twim_task_trigger(THE_TWIM, NRF_TWIM_TASK_SUSPEND);
-        while (!nrf_twim_event_check(THE_TWIM, NRF_TWIM_EVENT_SUSPENDED))
-            ;
-        return res;
+        return waitForStop(NRF_TWIM_EVENT_SUSPENDED);
     }
 }
 
