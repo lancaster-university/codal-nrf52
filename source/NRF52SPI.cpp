@@ -43,9 +43,10 @@ DEALINGS IN THE SOFTWARE.
 #define THE_HANDLER SPIM3_IRQHandler
 #define SZLIMIT 0xffff
 #else
-#define THE_SPIM NRF_SPIM0
-#define THE_IRQ SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn
-#define THE_HANDLER SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler
+// use SPIM2, as it has only SPI; 0 and 1 can be also used as I2C
+#define THE_SPIM NRF_SPIM2
+#define THE_IRQ SPIM2_SPIS2_SPI2_IRQn
+#define THE_HANDLER SPIM2_SPIS2_SPI2_IRQHandler
 #define SZLIMIT 0xff
 #endif
 
