@@ -58,13 +58,6 @@ namespace codal
         void* obj;
 
         /**
-             * Disconnect any attached mBed IO from this pin.
-             *
-             * Used only when pin changes mode (i.e. Input/Output/Analog/Digital)
-             */
-        void disconnect();
-
-        /**
              * Performs a check to ensure that the current Pin is in control of a
              * DynamicPwm instance, and if it's not, allocates a new DynamicPwm instance.
              */
@@ -98,6 +91,13 @@ namespace codal
         int disableEvents();
 
         public:
+
+        /**
+          * Disconnect any attached mBed IO from this pin.
+          *
+          * Used only when pin changes mode (i.e. Input/Output/Analog/Digital)
+          */
+        void disconnect();
 
         void rise();
         void fall();
