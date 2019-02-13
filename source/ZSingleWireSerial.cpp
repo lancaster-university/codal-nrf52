@@ -22,45 +22,46 @@ void UARTE0_UART0_IRQHandler_v()
 {
     if (ZSingleWireSerial::instance == NULL)
     {
+        NRF_UARTE0->EVENTS_RXDRDY = 0;
         NRF_UARTE0->EVENTS_ENDRX = 0;
         NRF_UARTE0->EVENTS_ENDTX = 0;
         NRF_UARTE0->EVENTS_ERROR = 0;
         return;
     }
 
-    // keep processing minimal
-    // any processing will result in lost bytes, or radio timing irregularities.
+    int eventValue = 0;
+    if (NRF_UART0->EVENTS_RXDRDY)
+    {
+        // after each byte received we receive an RXRDY interrupt, we use this interrupt to count the number of bytes received.
+        ZSingleWireSerial::instance->bytes_received++;
+        NRF_UART0->EVENTS_RXDRDY = 0;
+    }
     if (NRF_UARTE0->EVENTS_ENDRX)
     {
-        DMESG("RX");
         NRF_UARTE0->EVENTS_ENDRX = 0;
         ZSingleWireSerial::instance->configureRxInterrupt(0);
-
-        Event evt(0, SWS_EVT_DATA_RECEIVED, 0, CREATE_ONLY);
-        if (ZSingleWireSerial::instance->cb)
-            ZSingleWireSerial::instance->cb->fire(evt);
+        eventValue = SWS_EVT_DATA_RECEIVED;
     }
     else if (NRF_UARTE0->EVENTS_ENDTX)
     {
-        DMESG("TX");
         NRF_UARTE0->EVENTS_ENDTX = 0;
         ZSingleWireSerial::instance->configureTxInterrupt(0);
-
-        Event evt(0, (uint16_t)SWS_EVT_DATA_SENT, 0, CREATE_ONLY);
-
-        if (ZSingleWireSerial::instance->cb)
-            ZSingleWireSerial::instance->cb->fire(evt);
+        eventValue = SWS_EVT_DATA_SENT;
     }
     else if (NRF_UARTE0->EVENTS_ERROR && (NRF_UARTE0->INTENSET & UARTE_INTENSET_ERROR_Msk))
     {
-        DMESG("ERR %d", NRF_UARTE0->ERRORSRC);
         NRF_UARTE0->EVENTS_ERROR = 0;
-        ZSingleWireSerial::instance->abortDMA();
+        DMESG("ERR %d", NRF_UARTE0->ERRORSRC);
+        // clear error src
+        NRF_UARTE0->ERRORSRC = NRF_UARTE0->ERRORSRC;
+        eventValue = SWS_EVT_ERROR;
+    }
 
-        Event evt(0, (uint16_t)SWS_EVT_ERROR, 0, CREATE_ONLY);
+    if (eventValue > 0)
+    {
+        Event evt(0, eventValue, 0, CREATE_ONLY);
         if (ZSingleWireSerial::instance->cb)
             ZSingleWireSerial::instance->cb->fire(evt);
-        // NRF_UARTE0->ERRORSRC |= UART_ERRORSRC_OVERRUN_Msk;
     }
 }
 
@@ -72,15 +73,16 @@ void UARTE0_UART0_IRQHandler_v()
 void ZSingleWireSerial::configureRxInterrupt(int enable)
 {
     if (enable)
-        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDRX_Msk/* | UARTE_INTENSET_ERROR_Msk*/);
+        // for some reason RXD RDY event is not provided in the definitions (0x2)
+        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ERROR_Msk | 0x2);
     else
-        NRF_UARTE0->INTENCLR |= (UARTE_INTENCLR_ENDRX_Msk);
+        NRF_UARTE0->INTENCLR |= (UARTE_INTENCLR_ENDRX_Msk |  0x2);
 }
 
 void ZSingleWireSerial::configureTxInterrupt(int enable)
 {
     if (enable)
-        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDTX_Msk/* | UARTE_INTENSET_ERROR_Msk*/);
+        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDTX_Msk | UARTE_INTENSET_ERROR_Msk);
     else
         NRF_UARTE0->INTENCLR |= (UARTE_INTENCLR_ENDTX_Msk);
 }
@@ -206,6 +208,7 @@ int ZSingleWireSerial::receiveDMA(uint8_t* data, int len)
     NRF_UARTE0->RXD.PTR = (uint32_t)data;
     NRF_UARTE0->RXD.MAXCNT = len;
 
+    this->bytes_received = 0;
     configureRxInterrupt(1);
 
     NRF_UARTE0->TASKS_STARTRX = 1;
@@ -254,6 +257,16 @@ uint32_t ZSingleWireSerial::getBaud()
         return 115200;
 
     return 0;
+}
+
+int ZSingleWireSerial::getBytesTransmitted()
+{
+    return 0;
+}
+
+int ZSingleWireSerial::getBytesReceived()
+{
+    return bytes_received;
 }
 
 int ZSingleWireSerial::sendBreak()
