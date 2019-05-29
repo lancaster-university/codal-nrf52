@@ -59,9 +59,8 @@ void UARTE0_UART0_IRQHandler_v()
 
     if (eventValue > 0)
     {
-        Event evt(0, eventValue, 0, CREATE_ONLY);
         if (ZSingleWireSerial::instance->cb)
-            ZSingleWireSerial::instance->cb->fire(evt);
+            ZSingleWireSerial::instance->cb(eventValue);
     }
 }
 
