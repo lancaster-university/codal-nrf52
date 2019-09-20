@@ -16,6 +16,8 @@ namespace codal
 
         NRFLowLevelTimer(NRF_TIMER_Type* timer, IRQn_Type irqn);
 
+        virtual int setIRQPriority(int priority) override;
+
         virtual int enable();
 
         virtual int enableIRQ();
