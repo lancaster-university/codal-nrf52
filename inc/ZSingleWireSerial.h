@@ -5,8 +5,6 @@
 #include "CodalComponent.h"
 #include "CodalConfig.h"
 #include "SingleWireSerial.h"
-#include "NRFPPI.h"
-#include "NRFLowLevelTimer.h"
 #include "JACDAC.h"
 #include "MemberFunctionCallback.h"
 
@@ -18,12 +16,8 @@ namespace codal
 
     class ZSingleWireSerial : public DMASingleWireSerial
     {
-        // a timer that is solely use to count the number of bytes received
-        // thanks nordic ;)
-        NRFLowLevelTimer& timer;
-
-        NRFPPI* bytes_tx_ppi;
-        NRFPPI* bytes_rx_ppi;
+        uint8_t* buf;
+        uint16_t bufLen;
 
         protected:
         virtual int configureTx(int);
@@ -31,12 +25,14 @@ namespace codal
 
         public:
 
+        uint16_t bytes_received;
+
         virtual void configureRxInterrupt(int enable);
         virtual void configureTxInterrupt(int enable);
 
         static ZSingleWireSerial* instance;
 
-        ZSingleWireSerial(Pin& p, NRFLowLevelTimer& t);
+        ZSingleWireSerial(Pin& p);
 
         virtual int putc(char c);
         virtual int getc();
@@ -53,6 +49,7 @@ namespace codal
 
         int getBytesReceived() override;
         int getBytesTransmitted() override;
+
 
         virtual int sendBreak();
     };

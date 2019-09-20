@@ -22,6 +22,7 @@ void UARTE0_UART0_IRQHandler_v()
 {
     if (ZSingleWireSerial::instance == NULL)
     {
+        NRF_UARTE0->EVENTS_RXDRDY = 0;
         NRF_UARTE0->EVENTS_ENDRX = 0;
         NRF_UARTE0->EVENTS_ENDTX = 0;
         NRF_UARTE0->EVENTS_ERROR = 0;
@@ -29,6 +30,12 @@ void UARTE0_UART0_IRQHandler_v()
     }
 
     int eventValue = 0;
+    if (NRF_UART0->EVENTS_RXDRDY)
+    {
+        // after each byte received we receive an RXRDY interrupt, we use this interrupt to count the number of bytes received.
+        ZSingleWireSerial::instance->bytes_received++;
+        NRF_UART0->EVENTS_RXDRDY = 0;
+    }
     if (NRF_UARTE0->EVENTS_ENDRX)
     {
         NRF_UARTE0->EVENTS_ENDRX = 0;
@@ -66,7 +73,7 @@ void ZSingleWireSerial::configureRxInterrupt(int enable)
 {
     if (enable)
         // for some reason RXD RDY event is not provided in the definitions (0x2)
-        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ERROR_Msk);
+        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ERROR_Msk | 0x2);
     else
         NRF_UARTE0->INTENCLR |= (UARTE_INTENCLR_ENDRX_Msk |  0x2);
 }
@@ -131,7 +138,7 @@ int ZSingleWireSerial::configureRx(int enable)
     return DEVICE_OK;
 }
 
-ZSingleWireSerial::ZSingleWireSerial(Pin& p, NRFLowLevelTimer& t) : DMASingleWireSerial(p), timer(t)
+ZSingleWireSerial::ZSingleWireSerial(Pin& p) : DMASingleWireSerial(p)
 {
     if (instance == NULL)
         instance = this;
@@ -149,26 +156,6 @@ ZSingleWireSerial::ZSingleWireSerial(Pin& p, NRFLowLevelTimer& t) : DMASingleWir
     NRF_UARTE0->PSEL.RXD = 0xFFFFFFFF;
 
     setBaud(1000000);
-
-    this->bytes_tx_ppi = NRFPPIFactory::allocate();
-    this->bytes_rx_ppi = NRFPPIFactory::allocate();
-
-    CODAL_ASSERT(this->bytes_tx_ppi != NULL, DEVICE_HARDWARE_CONFIGURATION_ERROR);
-    CODAL_ASSERT(this->bytes_rx_ppi != NULL, DEVICE_HARDWARE_CONFIGURATION_ERROR);
-
-
-    // we count manually;
-    timer.disable();
-    timer.reset();
-
-    this->bytes_tx_ppi->setEventEndpoint(NRF_UART0->EVENTS_TXDRDY);
-    this->bytes_tx_ppi->setTaskEndpoint(timer.timer->TASKS_COUNT);
-
-    this->bytes_rx_ppi->setEventEndpoint(NRF_UART0->EVENTS_RXDRDY);
-    this->bytes_rx_ppi->setTaskEndpoint(timer.timer->TASKS_COUNT);
-
-    this->bytes_tx_ppi->enable();
-    this->bytes_rx_ppi->enable();
 
     NVIC_DisableIRQ(UARTE0_UART0_IRQn);
     NVIC_SetPriority(UARTE0_UART0_IRQn, 1);
@@ -202,8 +189,6 @@ int ZSingleWireSerial::sendDMA(uint8_t* data, int len)
     if (!(status & TX_CONFIGURED))
         setMode(SingleWireTx);
 
-    timer.reset();
-
     NRF_UARTE0->TXD.PTR = (uint32_t)data;
     NRF_UARTE0->TXD.MAXCNT = len;
 
@@ -219,11 +204,10 @@ int ZSingleWireSerial::receiveDMA(uint8_t* data, int len)
     if (!(status & RX_CONFIGURED))
         setMode(SingleWireRx);
 
-    timer.reset();
-
     NRF_UARTE0->RXD.PTR = (uint32_t)data;
     NRF_UARTE0->RXD.MAXCNT = len;
 
+    this->bytes_received = 0;
     configureRxInterrupt(1);
 
     NRF_UARTE0->TASKS_STARTRX = 1;
@@ -236,8 +220,8 @@ int ZSingleWireSerial::abortDMA()
     configureTxInterrupt(0);
     configureRxInterrupt(0);
 
-    configureTx(0);
-    configureRx(0);
+    NRF_UARTE0->RXD.MAXCNT = 0;
+    NRF_UARTE0->TXD.MAXCNT = 0;
 
     return DEVICE_OK;
 }
@@ -276,12 +260,12 @@ uint32_t ZSingleWireSerial::getBaud()
 
 int ZSingleWireSerial::getBytesTransmitted()
 {
-    return timer.captureCounter();
+    return 0;
 }
 
 int ZSingleWireSerial::getBytesReceived()
 {
-    return timer.captureCounter();
+    return bytes_received;
 }
 
 int ZSingleWireSerial::sendBreak()
