@@ -26,7 +26,6 @@ DEALINGS IN THE SOFTWARE.
 #define CODAL_MBED_SPI_H
 
 #include "CodalConfig.h"
-#include "mbed.h"
 #include "nrf_drv_spi.h"
 #include "codal-core/inc/driver-models/SPI.h"
 #include "codal-core/inc/driver-models/Pin.h"

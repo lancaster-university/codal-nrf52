@@ -48,7 +48,7 @@ CREATE_KEY_VALUE_TABLE(nrf52_saadc_id, nrf52_saadc_id_data);
 // Handle on the last (and probably only) instance of this class (NRF52 has only one SAADC module)
 static NRF52Microphone *nrf52_microphone_driver = NULL;
 
-void nrf52_adc_irq(void) 
+void nrf52_adc_irq(void)
 {
     // Simply pass on to the driver component handler.
     if (nrf52_microphone_driver)
@@ -99,14 +99,14 @@ NRF52Microphone::NRF52Microphone(Pin &pin, int sampleRate, uint16_t id) : inputP
     NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_14bit << SAADC_RESOLUTION_VAL_Pos);
     NRF_SAADC->OVERSAMPLE = 3;
 
-    NRF_SAADC->INTENSET = (SAADC_INTENSET_STARTED_Enabled << SAADC_INTENSET_STARTED_Pos) | 
+    NRF_SAADC->INTENSET = (SAADC_INTENSET_STARTED_Enabled << SAADC_INTENSET_STARTED_Pos) |
         (SAADC_INTENSET_END_Enabled << SAADC_INTENSET_END_Pos) |
         (SAADC_INTENSET_STOPPED_Enabled << SAADC_INTENSET_STOPPED_Pos );
 
     NRF_SAADC->CH[0].CONFIG = (SAADC_CH_CONFIG_RESP_Bypass << SAADC_CH_CONFIG_RESP_Pos) |
         (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
         (SAADC_CH_CONFIG_GAIN_Gain1_2 << SAADC_CH_CONFIG_GAIN_Pos) |
-        (SAADC_CH_CONFIG_REFSEL_Internal << SAADC_CH_CONFIG_REFSEL_Pos) | 
+        (SAADC_CH_CONFIG_REFSEL_Internal << SAADC_CH_CONFIG_REFSEL_Pos) |
         (SAADC_CH_CONFIG_TACQ_5us << SAADC_CH_CONFIG_TACQ_Pos) |
         (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
 
@@ -127,19 +127,19 @@ ManagedBuffer NRF52Microphone::pull()
 
 void NRF52Microphone::irq()
 {
-    if (NRF_SAADC->EVENTS_STARTED) 
-    { 
+    if (NRF_SAADC->EVENTS_STARTED)
+    {
         // We've just started receiving data the inputBuffer.
-        // So we don't miss any data, line up the next buffer. 
+        // So we don't miss any data, line up the next buffer.
         // (unless we've been asked to stop).
-        
+
         if (enabled)
             startDMA();
-        
+
         NRF_SAADC->EVENTS_STARTED = 0;
     }
 
-    if (NRF_SAADC->EVENTS_END) 
+    if (NRF_SAADC->EVENTS_END)
     {
         if (outputBuffer.length() > 0)
             output.pullRequest();
@@ -149,7 +149,7 @@ void NRF52Microphone::irq()
         NRF_SAADC->EVENTS_END = 0;
     }
 
-    if (NRF_SAADC->EVENTS_STOPPED) 
+    if (NRF_SAADC->EVENTS_STOPPED)
     {
         NRF_SAADC->EVENTS_STOPPED = 0;
     }
@@ -162,13 +162,13 @@ void NRF52Microphone::irq()
  * @param gain Value in the range 0..7. This corresponds to  the following gain being applied to the imput channel:
  *
  * 0: 1/6
- * 1: 1/5 
- * 2: 1/4 
- * 3: 1/3 
- * 4: 1/2 
- * 5: 1 
- * 6: 2 
- * 7: 4 
+ * 1: 1/5
+ * 2: 1/4
+ * 3: 1/3
+ * 4: 1/2
+ * 5: 1
+ * 6: 2
+ * 7: 4
  *
  * Default is defined by NRF52_MICROPHONE_DEFAULT_GAIN.
  */
@@ -233,7 +233,7 @@ void NRF52Microphone::enable()
         NRF_SAADC->CH[0].PSELP = nrf52_saadc_id.get(inputPin.name);
         NRF_SAADC->CH[0].PSELN = 0;
 
-        startDMA(); 
+        startDMA();
 
         NRF_SAADC->RESULT.MAXCNT = NRF52_MICROPHONE_BUFFER_SIZE / 2;
         NRF_SAADC->ENABLE = 1;
