@@ -31,10 +31,9 @@ DEALINGS IN THE SOFTWARE.
 #include "Button.h"
 #include "Timer.h"
 #include "ErrorNo.h"
-#include "nrf52.h"
-#include "nrf52_bitfields.h"
 #include "EventModel.h"
 #include "CodalDmesg.h"
+#include "nrf.h"
 
 using namespace codal;
 
