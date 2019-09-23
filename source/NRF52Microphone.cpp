@@ -27,7 +27,6 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalDmesg.h"
 #include "NRF52Microphone.h"
 #include "nrf.h"
-#include "InterruptManager.h"
 #include "cmsis.h"
 
 //

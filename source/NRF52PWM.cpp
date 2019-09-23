@@ -1,6 +1,5 @@
 #include "NRF52PWM.h"
 #include "nrf.h"
-#include "InterruptManager.h"
 #include "cmsis.h"
 #include "CodalDmesg.h"
 
