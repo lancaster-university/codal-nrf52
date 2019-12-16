@@ -94,6 +94,8 @@ int NRF52I2C::write(uint16_t address, uint8_t *data, int len, bool repeated)
 
     nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_STOPPED);
     nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_ERROR);
+    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_LASTTX);
+    nrf_twim_event_clear(THE_TWIM, NRF_TWIM_EVENT_TXSTARTED);
 
     nrf_twim_tx_buffer_set(THE_TWIM, data, len);
 
