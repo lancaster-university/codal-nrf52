@@ -21,14 +21,15 @@ void timer_handler(uint8_t instance_number)
 
     for(int i = 0; i < TIMER_CHANNEL_COUNT; i++)
     {
-        if(instances[1]->timer->EVENTS_COMPARE[i])
+        if(instances[instance_number]->timer->EVENTS_COMPARE[i])
         {
             channel_bitmsk |= 1 << i;
-            instances[1]->timer->EVENTS_COMPARE[i] = 0;
+            instances[instance_number]->timer->EVENTS_COMPARE[i] = 0;
         }
     }
 
-    instances[1]->timer_pointer(channel_bitmsk);
+    if (instances[instance_number]->timer_pointer)
+        instances[instance_number]->timer_pointer(channel_bitmsk);
 }
 
 #if defined(NRF52832) || defined(NRF52840)
@@ -83,13 +84,19 @@ NRFLowLevelTimer::NRFLowLevelTimer(NRF_TIMER_Type* t, IRQn_Type irqn) : LowLevel
     instances[instanceNumber] = this;
 
     disable();
+    setIRQPriority(2);
     setClockSpeed(1000);
     setBitMode(BitMode32);
 }
 
+int NRFLowLevelTimer::setIRQPriority(int priority)
+{
+    NVIC_SetPriority(irqn, priority);
+    return DEVICE_OK;
+}
+
 int NRFLowLevelTimer::enable()
 {
-    NVIC_SetPriority(irqn, 1);
     NVIC_ClearPendingIRQ(irqn);
 
     timer->TASKS_START = 1;

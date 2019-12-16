@@ -37,7 +37,6 @@ DEALINGS IN THE SOFTWARE.
 #include "codal_target_hal.h"
 
 
-
 #define CODAL_ASSERT(cond)                                                                         \
     if (!(cond))                                                                                   \
     target_panic(50)
@@ -148,7 +147,7 @@ void NRF52Pin::disconnect()
             delete ((Button*)obj);
     }
 
-    if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE))
+    if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE))
     {
         // disconnect pin cng
         PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
@@ -227,7 +226,7 @@ int NRF52Pin::getDigitalValue()
     if(!(PIN_CAPABILITY_DIGITAL & capability))
         return DEVICE_NOT_SUPPORTED;
 
-    if (!(status & (IO_STATUS_DIGITAL_IN | IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE)))
+    if (!(status & (IO_STATUS_DIGITAL_IN | IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
     {
         disconnect();
 
@@ -603,6 +602,9 @@ void NRF52Pin::rise()
 
     if(status & IO_STATUS_EVENT_ON_EDGE)
         Event(id, DEVICE_PIN_EVT_RISE, 0);
+
+    if (status & IO_STATUS_INTERRUPT_ON_EDGE && gpio_irq)
+        this->gpio_irq(1);
 }
 
 void NRF52Pin::fall()
@@ -612,6 +614,9 @@ void NRF52Pin::fall()
 
     if(status & IO_STATUS_EVENT_ON_EDGE)
         Event(id, DEVICE_PIN_EVT_FALL, 0);
+
+    if (status & IO_STATUS_INTERRUPT_ON_EDGE && gpio_irq)
+        this->gpio_irq(0);
 }
 
 /**
@@ -626,7 +631,7 @@ void NRF52Pin::fall()
 int NRF52Pin::enableRiseFallEvents(int eventType)
 {
     // if we are in neither of the two modes, configure pin as a TimedInterruptIn.
-    if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE)))
+    if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
     {
         getDigitalValue(pullMode);
 
@@ -643,13 +648,15 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
         interrupt_enable |= (1 << this->name);
     }
 
-    status &= ~(IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE);
+    status &= ~(IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE);
 
     // set our status bits accordingly.
     if(eventType == DEVICE_PIN_EVENT_ON_EDGE)
         status |= IO_STATUS_EVENT_ON_EDGE;
     else if(eventType == DEVICE_PIN_EVENT_ON_PULSE)
         status |= IO_STATUS_EVENT_PULSE_ON_EDGE;
+    else if(eventType == DEVICE_PIN_INTERRUPT_ON_EDGE)
+        status |= IO_STATUS_INTERRUPT_ON_EDGE;
 
     return DEVICE_OK;
 }
@@ -662,7 +669,7 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
   */
 int NRF52Pin::disableEvents()
 {
-    if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_TOUCH_IN))
+    if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_TOUCH_IN | IO_STATUS_INTERRUPT_ON_EDGE))
         disconnect();
 
     return DEVICE_OK;

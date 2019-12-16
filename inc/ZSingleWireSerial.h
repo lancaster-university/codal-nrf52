@@ -25,6 +25,8 @@ namespace codal
 
         public:
 
+        uint16_t bytes_received;
+
         virtual void configureRxInterrupt(int enable);
         virtual void configureTxInterrupt(int enable);
 
@@ -44,6 +46,10 @@ namespace codal
 
         virtual int setBaud(uint32_t baud);
         virtual uint32_t getBaud();
+
+        int getBytesReceived() override;
+        int getBytesTransmitted() override;
+
 
         virtual int sendBreak();
     };
