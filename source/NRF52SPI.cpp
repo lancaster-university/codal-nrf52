@@ -181,9 +181,9 @@ void NRF52SPI::config()
     nrf_spim_int_enable(p_spim, NRF_SPIM_INT_END_MASK | NRF_SPIM_INT_STOPPED_MASK);
     nrf_spim_enable(p_spim);
 
-    sd_nvic_SetPriority(IRQn, 7);
-    sd_nvic_ClearPendingIRQ(IRQn);
-    sd_nvic_EnableIRQ(IRQn);
+    NVIC_SetPriority(IRQn, 7);
+    NVIC_ClearPendingIRQ(IRQn);
+    NVIC_EnableIRQ(IRQn);
 
     DMESG("SPI config done f=%p", freq);
 }

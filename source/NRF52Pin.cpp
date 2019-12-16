@@ -37,10 +37,6 @@ DEALINGS IN THE SOFTWARE.
 #include "codal_target_hal.h"
 
 
-#define CODAL_ASSERT(cond)                                                                         \
-    if (!(cond))                                                                                   \
-    target_panic(50)
-
 using namespace codal;
 
 #ifdef NRF_P1
@@ -115,7 +111,7 @@ void GPIOTE_IRQHandler(void)
 NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pin(id, name, capability)
 {
     this->pullMode = DEVICE_DEFAULT_PULLMODE;
-    CODAL_ASSERT(name < NUM_PINS);
+    CODAL_ASSERT(name < NUM_PINS, 50);
     irq_pins[name] = this;
 
     // Power up in a disconnected, low power state.
