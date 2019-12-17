@@ -28,8 +28,7 @@ DEALINGS IN THE SOFTWARE.
 #include "EventModel.h"
 #include "Event.h"
 #include "ErrorNo.h"
-#include "nrf52.h"
-#include "nrf52_bitfields.h"
+#include "nrf.h"
 
 const int8_t NRF52_BLE_POWER_LEVEL[] = {-30, -20, -16, -12, -8, -4, 0, 4};
 

@@ -1,16 +1,30 @@
 project(codal-nrf52)
 
+string(FIND "${device.processor}" "NRF52840" pos)
+if (NOT "${pos}" STREQUAL "-1")
+    set(TEMPLATE "nRF52840")
+    set(DEV "nrf52840")
+else()
+    set(TEMPLATE "nRF52832")
+    set(DEV "nrf52")
+endif()
+
 include("${CODAL_UTILS_LOCATION}")
 
 # find sources and headers
-RECURSIVE_FIND_DIR(INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/inc" "*.h")
 RECURSIVE_FIND_FILE(SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/source" "*.c??")
 
-list(APPEND SOURCE_FILES "source/reloc_vector_table.c")
-list(APPEND SOURCE_FILES "source/nrf_delay.c")
-list(APPEND SOURCE_FILES "source/system_nrf52.c")
+list(APPEND INCLUDE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/inc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/inc/cmsis"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/mdk"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrfx"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/templates/${TEMPLATE}"
+)
+
 list(APPEND SOURCE_FILES "asm/CortexContextSwitch.s")
-list(APPEND SOURCE_FILES "asm/startup_NRF52832.s")
+list(APPEND SOURCE_FILES "nrfx/mdk/system_${DEV}.c")
+list(APPEND SOURCE_FILES "nrfx/mdk/gcc_startup_${DEV}.S")
 
 # add them
 include_directories(${INCLUDE_DIRS})

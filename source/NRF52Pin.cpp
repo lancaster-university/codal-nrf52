@@ -31,20 +31,32 @@ DEALINGS IN THE SOFTWARE.
 #include "Button.h"
 #include "Timer.h"
 #include "ErrorNo.h"
+#include "nrf.h"
 #include "EventModel.h"
 #include "CodalDmesg.h"
-#include "nrf.h"
+#include "codal_target_hal.h"
+
 
 using namespace codal;
 
+#ifdef NRF_P1
+#define PORT (name < 32 ? NRF_P0 : NRF_P1)
+#define PIN ((name) & 31)
+#define NUM_PINS 48
+#else
+#define PORT (NRF_P0)
+#define PIN (name)
+#define NUM_PINS 32
+#endif
+
 volatile uint32_t interrupt_enable = 0;
 
-static NRF52Pin *irq_pins[32];
+static NRF52Pin *irq_pins[NUM_PINS];
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-void GPIOTE_IRQHandler_v(void)
+void GPIOTE_IRQHandler(void)
 {
     if (NRF_GPIOTE->EVENTS_PORT && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
     {
@@ -99,7 +111,7 @@ void GPIOTE_IRQHandler_v(void)
 NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pin(id, name, capability)
 {
     this->pullMode = DEVICE_DEFAULT_PULLMODE;
-
+    CODAL_ASSERT(name < NUM_PINS, 50);
     irq_pins[name] = this;
 
     // Power up in a disconnected, low power state.
@@ -134,7 +146,7 @@ void NRF52Pin::disconnect()
     if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE))
     {
         // disconnect pin cng
-        NRF_P0->PIN_CNF[name] &= ~(GPIO_PIN_CNF_SENSE_Msk);
+        PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
         interrupt_enable &= ~(1 << this->name);
 
         // if (obj)
@@ -168,8 +180,16 @@ int NRF52Pin::setDigitalValue(int value)
     {
         disconnect();
 
-        // Enable output mode.
-        NRF_P0->DIRSET = 1 << name;
+        uint32_t cnf = PORT->PIN_CNF[PIN];
+        
+        // output
+        cnf |= 1;
+
+        // high drive
+        // cnf |= (3 << 8);
+        // cnf &= ~(1 << 10);
+
+        PORT->PIN_CNF[PIN] = cnf;
 
         // Record our mode, so we can optimise later.
         status |= IO_STATUS_DIGITAL_OUT;
@@ -177,9 +197,9 @@ int NRF52Pin::setDigitalValue(int value)
 
     // Write the value.
     if (value)
-        NRF_P0->OUTSET = 1 << name;
+        PORT->OUTSET = 1 << PIN;
     else
-        NRF_P0->OUTCLR = 1 << name;
+        PORT->OUTCLR = 1 << PIN;
 
     return DEVICE_OK;
 }
@@ -207,14 +227,14 @@ int NRF52Pin::getDigitalValue()
         disconnect();
 
         // Enable input mode, and input buffer
-        NRF_P0->PIN_CNF[name] &= 0xfffffffc;
+        PORT->PIN_CNF[PIN] &= 0xfffffffc;
 
         // Record our mode, so we can optimise later.
         status |= IO_STATUS_DIGITAL_IN;
     }
 
     // return the current state of the pin
-    return (NRF_P0->IN & (1 << name)) ? 1 : 0;
+    return (PORT->IN & (1 << PIN)) ? 1 : 0;
 }
 
 /**
@@ -536,7 +556,7 @@ int NRF52Pin::setPull(PullMode pull)
 {
     pullMode = pull;
 
-    uint32_t s = NRF_P0->PIN_CNF[name] & 0xfffffff3;
+    uint32_t s = PORT->PIN_CNF[PIN] & 0xfffffff3;
 
     if (pull == PullMode::Down)
         s |= 0x00000004;
@@ -545,7 +565,7 @@ int NRF52Pin::setPull(PullMode pull)
         s |= 0x0000000c;
 
 
-    NRF_P0->PIN_CNF[name] = s;
+    PORT->PIN_CNF[PIN] = s;
 
     return DEVICE_OK;
 }
@@ -616,9 +636,9 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
 
         ((PinTimeStruct*)obj)->last_time = 0;
 
-        NRF_P0->PIN_CNF[name] &= ~(GPIO_PIN_CNF_SENSE_Msk);
-        NRF_P0->PIN_CNF[name] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
-        NRF_P0->PIN_CNF[name] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+        PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
+        PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+        PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
 
         // configure as interrupt in
         interrupt_enable |= (1 << this->name);
