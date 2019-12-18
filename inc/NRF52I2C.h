@@ -28,6 +28,7 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalConfig.h"
 #include "codal-core/inc/driver-models/I2C.h"
 #include "NRF52Pin.h"
+#include "hal/nrf_twim.h"
 
 namespace codal
 {
@@ -39,6 +40,7 @@ class NRF52I2C : public codal::I2C
     int waitForStop(int evt);
 protected:
     NRF52Pin &sda, &scl;
+    NRF_TWIM_Type *p_twim;
 public:
     /**
      * Constructor.

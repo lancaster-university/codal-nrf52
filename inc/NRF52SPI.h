@@ -42,7 +42,7 @@ class NRF52SPI : public codal::SPI
     codal::Pin &mosi;
     codal::Pin &miso;
     codal::Pin &sck;
-    nrf_spi_frequency_t freq;
+    nrf_spim_frequency_t freq;
     IRQn_Type IRQn;
     uint8_t mode;
     uint8_t configured;
@@ -58,8 +58,8 @@ class NRF52SPI : public codal::SPI
     int xfer(uint8_t const *p_tx_buffer, uint32_t tx_length, uint8_t *p_rx_buffer,
              uint32_t rx_length, PVoidCallback doneHandler, void *arg);
 
+    static void _irqDoneHandler(void *self);
 public:
-    void _irqDoneHandler();
 
     /**
      * Initialize SPI instance with given pins.
