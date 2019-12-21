@@ -4,10 +4,14 @@
 #include "ErrorNo.h"
 #include "CodalFiber.h"
 
+// This only works when SCK and LRCK are defined, so one has to burn
+// two high speed pins for no good reason.
+// See https://devzone.nordicsemi.com/f/nordic-q-a/55802/driving-ws2812b-neopixels-with-i2s-without-sck-lrck
+
 namespace codal
 {
 
-// base on https://electronut.in/nrf52-i2s-ws2812/
+// based on https://electronut.in/nrf52-i2s-ws2812/
 
 static int numIrq;
 
@@ -29,6 +33,7 @@ extern "C" void I2S_IRQHandler()
         }
     }
 }
+
 
 void neopixel_send_buffer(Pin *pin, const uint8_t *data, unsigned size)
 {
