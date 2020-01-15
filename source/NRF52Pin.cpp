@@ -63,26 +63,26 @@ void GPIOTE_IRQHandler(void)
         NRF_GPIOTE->EVENTS_PORT = 0;
         for (uint8_t i = 0; i < 31; i++)
         {
-            if (interrupt_enable & (1 << i) && irq_pins[i])
+            if (interrupt_enable & (1 << i) && irq_pins[i] && NRF_P0->LATCH & (1 << i))
             {
+                uint32_t currCnf = NRF_P0->PIN_CNF[i];
+                uint8_t currSense = (currCnf & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos;
+                
                 // hi: latch indicates a state change... determine if we were looking for hi or lo.
-                if ((NRF_P0->LATCH & (1 << i)) && ((NRF_P0->PIN_CNF[i] >> GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Low) != GPIO_PIN_CNF_SENSE_Low)
+                if (currSense == GPIO_PIN_CNF_SENSE_High)
                 {
-                    NRF_P0->LATCH |= (1 << i);
                     // swap!
-                    NRF_P0->PIN_CNF[i] &= ~(GPIO_PIN_CNF_SENSE_Msk);
-                    NRF_P0->PIN_CNF[i] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+                    NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+                    // need to clear latch after swap
+                    NRF_P0->LATCH |= (1 << i);
                     irq_pins[i]->rise();
                 }
-
-                // lo: latch indicates a state change... determine if we were looking for hi or lo.
-                if ((NRF_P0->LATCH & (1 << i)) && ((NRF_P0->PIN_CNF[i] >> GPIO_PIN_CNF_SENSE_Pos) & GPIO_PIN_CNF_SENSE_Low) == GPIO_PIN_CNF_SENSE_Low)
+                else
                 {
-                        NRF_P0->LATCH |= (1 << i);
-                        // swap!
-                        NRF_P0->PIN_CNF[i] &= ~(GPIO_PIN_CNF_SENSE_Msk);
-                        NRF_P0->PIN_CNF[i] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
-                        irq_pins[i]->fall();
+                    // swap!
+                    NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+                    NRF_P0->LATCH |= (1 << i);
+                    irq_pins[i]->fall();
                 }
             }
         }
