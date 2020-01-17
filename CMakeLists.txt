@@ -19,12 +19,18 @@ list(APPEND INCLUDE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}/inc/cmsis"
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/mdk"
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/templates/"
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/templates/${TEMPLATE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/drivers/include"
 )
 
 list(APPEND SOURCE_FILES "asm/CortexContextSwitch.s")
 list(APPEND SOURCE_FILES "nrfx/mdk/system_${DEV}.c")
 list(APPEND SOURCE_FILES "nrfx/mdk/gcc_startup_${DEV}.S")
+list(APPEND SOURCE_FILES "nrfx/drivers/src/nrfx_uarte.c")
+list(APPEND SOURCE_FILES "nrfx/drivers/src/prs/nrfx_prs.c")
+
+
 
 # add them
 include_directories(${INCLUDE_DIRS})
