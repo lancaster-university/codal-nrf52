@@ -723,3 +723,34 @@ int NRF52Pin::eventOn(int eventType)
 
     return DEVICE_OK;
 }
+
+/**
+ * Configures this IO pin as a high drive pin (capable of sourcing/sinking greater current).
+ * By default, pins are STANDARD drive.
+ *
+ * @param value true to enable HIGH DRIVE on this pin, false otherwise
+ */
+int NRF52Pin::setHighDrive(bool value)
+{
+    uint32_t s = PORT->PIN_CNF[PIN] & 0xfffff8ff;
+
+    if (value)
+        s |= 0x00000300;
+
+    PORT->PIN_CNF[PIN] = s;
+
+    return DEVICE_OK;
+}
+
+/**
+ * Determines if this IO pin is a high drive pin (capable of sourcing/sinking greater current).
+ * By default, pins are STANDARD drive.
+ *
+ * @return true if HIGH DRIVE is enabled on this pin, false otherwise
+ */
+bool NRF52Pin::isHighDrive()
+{
+    uint32_t s = PORT->PIN_CNF[PIN] & 0x00000700;
+
+    return (s == 0x00000300);
+}

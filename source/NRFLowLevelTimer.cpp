@@ -32,7 +32,7 @@ void timer_handler(uint8_t instance_number)
         instances[instance_number]->timer_pointer(channel_bitmsk);
 }
 
-#if defined(NRF52832) || defined(NRF52840)
+#if defined(NRF52832) ||defined(NRF52833) || defined(NRF52840)
 extern "C" void TIMER0_IRQHandler()
 {
     timer_handler(0);
