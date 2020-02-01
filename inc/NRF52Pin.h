@@ -29,14 +29,6 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalConfig.h"
 #include "CodalComponent.h"
 #include "Event.h"
-                                                        // Status Field flags...
-#define IO_STATUS_DIGITAL_IN                0x01        // Pin is configured as a digital input, with no pull up.
-#define IO_STATUS_DIGITAL_OUT               0x02        // Pin is configured as a digital output
-#define IO_STATUS_ANALOG_IN                 0x04        // Pin is Analog in
-#define IO_STATUS_ANALOG_OUT                0x08        // Pin is Analog out
-#define IO_STATUS_TOUCH_IN                  0x10        // Pin is a makey-makey style touch sensor
-#define IO_STATUS_EVENT_ON_EDGE             0x20        // Pin will generate events on pin change
-#define IO_STATUS_EVENT_PULSE_ON_EDGE       0x40        // Pin will generate events on pin change
 
 #define ID_NRF52_PIN_HI  (DEVICE_ID_IO_P0 + 35)
 #define ID_NRF52_PIN_LO  (DEVICE_ID_IO_P0 + 36)
@@ -343,6 +335,22 @@ namespace codal
              *       please use the InterruptIn class supplied by ARM mbed.
              */
         int eventOn(int eventType);
+
+        /**
+         * Configures this IO pin as a high drive pin (capable of sourcing/sinking greater current).
+         * By default, pins are STANDARD drive.
+         *
+         * @param value true to enable HIGH DRIVE on this pin, false otherwise
+         */
+        int setHighDrive(bool value);
+
+        /**
+         * Determines if this IO pin is a high drive pin (capable of sourcing/sinking greater current).
+         * By default, pins are STANDARD drive.
+         *
+         * @return true if HIGH DRIVE is enabled on this pin, false otherwise
+         */
+        bool isHighDrive();
     };
 }
 
