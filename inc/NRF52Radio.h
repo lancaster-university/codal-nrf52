@@ -71,7 +71,7 @@ namespace codal
 #define NRF52_RADIO_DEFAULT_GROUP            0
 #define NRF52_RADIO_DEFAULT_TX_POWER         6
 #define NRF52_RADIO_DEFAULT_FREQUENCY        7
-#define NRF52_RADIO_MAX_PACKET_SIZE          40
+#define NRF52_RADIO_MAX_PACKET_SIZE          32
 #define NRF52_RADIO_HEADER_SIZE              4
 #define NRF52_RADIO_MAXIMUM_RX_BUFFERS       4
 
