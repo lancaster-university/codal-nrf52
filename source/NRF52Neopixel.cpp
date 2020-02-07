@@ -4,6 +4,9 @@
 #include "ErrorNo.h"
 #include "CodalFiber.h"
 
+// This wastes pins. We instead should use the PWM periperhal.
+#if 0
+
 // This only works when SCK and LRCK are defined, so one has to burn
 // two high speed pins for no good reason.
 // See https://devzone.nordicsemi.com/f/nordic-q-a/55802/driving-ws2812b-neopixels-with-i2s-without-sck-lrck
@@ -104,3 +107,5 @@ void neopixel_send_buffer(Pin *pin, const uint8_t *data, unsigned size)
 }
 
 } // namespace codal
+
+#endif
