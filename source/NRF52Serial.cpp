@@ -118,7 +118,9 @@ NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* uart) : Serial(tx, rx
     hal_config.hwfc = NRF_UARTE_HWFC_DISABLED;
     hal_config.parity = NRF_UARTE_PARITY_EXCLUDED;
     hal_config.stop = NRF_UARTE_STOP_ONE;
+#if defined(UARTE_CONFIG_PARITYTYPE_Msk)
     hal_config.paritytype = NRF_UARTE_PARITYTYPE_EVEN;
+#endif
 
     uart_config.hal_cfg = hal_config;
 

@@ -28,33 +28,16 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalDmesg.h"
 #include "codal-core/inc/types/Event.h"
 #include "CodalFiber.h"
-//#include "nrf_nvic.h"
+#include "sync_serial.h"
 
-#define USE_SPIM3 0
-
-#ifdef TARGET_MCU_NRF52840
-// SPIM3 has hardware bugs
-// #define USE_SPIM3 1
-#endif
-
-#if USE_SPIM3
-#define THE_SPIM NRF_SPIM3
-#define THE_IRQ SPIM3_IRQn
-#define THE_HANDLER SPIM3_IRQHandler
-#define SZLIMIT 0xffff
+#ifdef NRF_SPIM3
+#define SZLIMIT (p_spim == NRF_SPIM3 ? 0xffff : 0xff)
 #else
-// use SPIM2, as it has only SPI; 0 and 1 can be also used as I2C
-#define THE_SPIM NRF_SPIM2
-#define THE_IRQ SPIM2_SPIS2_SPI2_IRQn
-#define THE_HANDLER SPIM2_SPIS2_SPI2_IRQHandler
 #define SZLIMIT 0xff
 #endif
 
 namespace codal
 {
-
-// in future, we might need once instance per SPIM instance (up to 4)
-static NRF52SPI *instance;
 
 /**
  * Constructor.
@@ -62,35 +45,35 @@ static NRF52SPI *instance;
 NRF52SPI::NRF52SPI(Pin &mosi, Pin &miso, Pin &sclk)
     : codal::SPI(), mosi(mosi), miso(miso), sck(sclk)
 {
-    p_spim = THE_SPIM;
-    IRQn = THE_IRQ;
+    p_spim = (NRF_SPIM_Type *)allocate_sync_serial(SYNC_SERIAL_MODE_SPIM);
+    if (!p_spim)
+        target_panic(DEVICE_HARDWARE_CONFIGURATION_ERROR);
+    IRQn = sync_serial_irqn(p_spim);
     configured = 0;
     setFrequency(1000000);
     setMode(0);
-    instance = this;
     doneHandler = NULL;
+    set_sync_serial_irq(p_spim, &_irqDoneHandler, this);
 }
 
-extern "C" void THE_HANDLER()
+void NRF52SPI::_irqDoneHandler(void *self_)
 {
-    if (nrf_spim_event_check(THE_SPIM, NRF_SPIM_EVENT_END))
-    {
-        nrf_spim_event_clear(THE_SPIM, NRF_SPIM_EVENT_END);
-        instance->_irqDoneHandler();
-    }
-}
+    NRF52SPI *self = (NRF52SPI *)self_;
 
-void NRF52SPI::_irqDoneHandler()
-{
-    if (doneHandler)
+    if (nrf_spim_event_check(self->p_spim, NRF_SPIM_EVENT_END))
     {
-        PVoidCallback done = doneHandler;
-        doneHandler = NULL;
-        done(doneHandlerArg);
-    }
-    else
-    {
-        Event(DEVICE_ID_SPI, 3);
+        nrf_spim_event_clear(self->p_spim, NRF_SPIM_EVENT_END);
+
+        if (self->doneHandler)
+        {
+            PVoidCallback done = self->doneHandler;
+            self->doneHandler = NULL;
+            done(self->doneHandlerArg);
+        }
+        else
+        {
+            Event(DEVICE_ID_SPI, 3);
+        }
     }
 }
 
@@ -98,7 +81,7 @@ int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint32_t tx_length, uint8_t *p_rx
                    uint32_t rx_length, PVoidCallback doneHandler, void *arg)
 {
     config();
-    
+
     if (tx_length > SZLIMIT || rx_length > SZLIMIT)
         return DEVICE_INVALID_PARAMETER;
 
@@ -127,8 +110,7 @@ int NRF52SPI::xfer(uint8_t const *p_tx_buffer, uint32_t tx_length, uint8_t *p_rx
     return 0;
 }
 
-int NRF52SPI::transfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
-                       uint32_t rxSize)
+int NRF52SPI::transfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer, uint32_t rxSize)
 {
     if (txSize <= SZLIMIT && rxSize <= SZLIMIT)
         return xfer(txBuffer, txSize, rxBuffer, rxSize, NULL, NULL);
@@ -194,27 +176,29 @@ void NRF52SPI::config()
  */
 int NRF52SPI::setFrequency(uint32_t frequency)
 {
-#if USE_SPIM3
-    if (frequency >= 32000000)
-        freq = (nrf_drv_spi_frequency_t)0x14000000; // 32M
-    else if (frequency >= 16000000)
-        freq = (nrf_drv_spi_frequency_t)0x0A000000; // 16M
+    configured = 0;
+
+#ifdef NRF_SPIM3
+    if (p_spim == NRF_SPIM3 && frequency >= 32000000)
+        freq = NRF_SPIM_FREQ_32M;
+    else if (p_spim == NRF_SPIM3 && frequency >= 16000000)
+        freq = NRF_SPIM_FREQ_16M;
     else
 #endif
-    if (frequency >= 8000000)
-        freq = NRF_SPI_FREQ_8M;
+        if (frequency >= 8000000)
+        freq = NRF_SPIM_FREQ_8M;
     else if (frequency >= 4000000)
-        freq = NRF_SPI_FREQ_4M;
+        freq = NRF_SPIM_FREQ_4M;
     else if (frequency >= 2000000)
-        freq = NRF_SPI_FREQ_2M;
+        freq = NRF_SPIM_FREQ_2M;
     else if (frequency >= 1000000)
-        freq = NRF_SPI_FREQ_1M;
+        freq = NRF_SPIM_FREQ_1M;
     else if (frequency >= 500000)
-        freq = NRF_SPI_FREQ_500K;
+        freq = NRF_SPIM_FREQ_500K;
     else if (frequency >= 250000)
-        freq = NRF_SPI_FREQ_250K;
+        freq = NRF_SPIM_FREQ_250K;
     else
-        freq = NRF_SPI_FREQ_125K;
+        freq = NRF_SPIM_FREQ_125K;
     return DEVICE_OK;
 }
 
@@ -234,6 +218,7 @@ int NRF52SPI::setFrequency(uint32_t frequency)
  */
 int NRF52SPI::setMode(int mode, int bits)
 {
+    configured = 0;
     this->mode = mode;
     if (bits != 8)
         return DEVICE_INVALID_PARAMETER;
@@ -254,4 +239,4 @@ int NRF52SPI::write(int data)
     int ret = xfer(&sendCh, 1, &recvCh, 1, NULL, NULL);
     return (ret < 0) ? (int)DEVICE_SPI_ERROR : recvCh;
 }
-}
+} // namespace codal
