@@ -49,11 +49,11 @@ int NRF52Serial::setBaudrate(uint32_t baudrate)
 {
     nrf_uarte_baudrate_t baud = NRF_UARTE_BAUDRATE_115200;
 
-    if (baud == 1000000)
+    if (baudrate == 1000000)
         baud = NRF_UARTE_BAUDRATE_1000000;
-    else if (baud == 38400)
+    else if (baudrate == 38400)
         baud = NRF_UARTE_BAUDRATE_38400;
-    else if (baud == 9600)
+    else if (baudrate == 9600)
         baud = NRF_UARTE_BAUDRATE_9600;
 
     nrf_uarte_baudrate_set(this->uart_instance.p_reg, baud);
