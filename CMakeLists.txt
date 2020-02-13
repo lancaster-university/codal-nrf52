@@ -36,7 +36,7 @@ list(APPEND SOURCE_FILES "nrfx/mdk/gcc_startup_${DEV}.S")
 list(APPEND SOURCE_FILES "nrfx/drivers/src/nrfx_uarte.c")
 list(APPEND SOURCE_FILES "nrfx/drivers/src/prs/nrfx_prs.c")
 
-
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNRFX_PRS_ENABLED=0")
 
 # add them
 include_directories(${INCLUDE_DIRS})
