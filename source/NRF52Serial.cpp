@@ -102,6 +102,12 @@ int NRF52Serial::getc()
 NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* uart) : Serial(tx, rx)
 {
     memset(&this->uart_instance, 0, sizeof(nrfx_uarte_t));
+
+    if (uart == NULL)
+    {
+        uart = NRF_UARTE0;
+    }
+    
     this->uart_instance.p_reg = uart;
 
     nrfx_uarte_config_t uart_config;
