@@ -68,16 +68,7 @@ struct PROCESSOR_TCB
 
 PROCESSOR_WORD_TYPE fiber_initial_stack_base()
 {
-    uint32_t mbed_stack_base;
-
-#ifdef MBED_CONF_RTOS_PRESENT
-    extern osThreadAttr_t _main_thread_attr;
-    mbed_stack_base = (uint32_t)_main_thread_attr.stack_mem + _main_thread_attr.stack_size;
-#else
-    mbed_stack_base = DEVICE_STACK_BASE;
-#endif
-
-    return mbed_stack_base;
+    return DEVICE_STACK_BASE;
 }
 
 void* tcb_allocate()
@@ -123,11 +114,7 @@ PROCESSOR_WORD_TYPE tcb_get_stack_base(void* tcb)
 
 PROCESSOR_WORD_TYPE get_current_sp()
 {
-#ifdef MBED_CONF_RTOS_PRESENT
-    return __get_PSP();
-#else
     return __get_MSP();
-#endif
 }
 
 PROCESSOR_WORD_TYPE tcb_get_sp(void* tcb)
