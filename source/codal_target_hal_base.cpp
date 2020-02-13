@@ -32,10 +32,21 @@ void target_reset()
 extern "C" void _start();
 extern "C" __attribute__((weak)) void user_init() {}
 
+#define NUM_VTOR_ENTRIES (NVIC_USER_IRQ_OFFSET + 48)
+
+__attribute__((aligned(256)))
+static uint32_t vtorStorage[NUM_VTOR_ENTRIES];
+static void relocate_vtor()
+{
+    memcpy(vtorStorage, (void *)SCB->VTOR, sizeof(vtorStorage));
+    SCB->VTOR = (uint32_t)vtorStorage;
+}
+
 extern "C" void target_start()
 {
     NRF_NVMC->ICACHECNF = NVMC_ICACHECNF_CACHEEN_Enabled;
     user_init();
+    relocate_vtor();
     _start();
 }
 
