@@ -34,19 +34,28 @@ extern "C" __attribute__((weak)) void user_init() {}
 
 #define NUM_VTOR_ENTRIES (NVIC_USER_IRQ_OFFSET + 48)
 
-__attribute__((aligned(256)))
-static uint32_t vtorStorage[NUM_VTOR_ENTRIES];
-static void relocate_vtor()
+class VtorCopy
 {
-    memcpy(vtorStorage, (void *)SCB->VTOR, sizeof(vtorStorage));
-    SCB->VTOR = (uint32_t)vtorStorage;
-}
+public:
+    uint32_t vtorStorage[NUM_VTOR_ENTRIES];
+    VtorCopy()
+    {
+        if ((uint32_t)vtorStorage & 0xff)
+            target_panic(999);
+        auto origVtor = (void*)SCB->VTOR;
+        memcpy(vtorStorage, origVtor, sizeof(vtorStorage));
+        SCB->VTOR = (uint32_t)vtorStorage;
+        DMESG("relocate vtor to %x -> %x %x", origVtor, vtorStorage, SCB->VTOR);
+    }
+};
+
+// this needs to run after BSS sections are cleared (which happens at the beginning of _start())
+__attribute__((used, aligned(512))) static VtorCopy vtorCopy;
 
 extern "C" void target_start()
 {
     NRF_NVMC->ICACHECNF = NVMC_ICACHECNF_CACHEEN_Enabled;
     user_init();
-    relocate_vtor();
     _start();
 }
 
