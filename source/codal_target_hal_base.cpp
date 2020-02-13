@@ -29,7 +29,6 @@ void target_reset()
     NVIC_SystemReset();
 }
 
-
 extern "C" void _start();
 extern "C" __attribute__((weak)) void user_init() {}
 
@@ -41,11 +40,11 @@ extern "C" void target_start()
 }
 
 /**
-  *  Thread Context for an ARM Cortex core.
-  *
-  * This is probably overkill, but the ARMCC compiler uses a lot register optimisation
-  * in its calling conventions, so better safe than sorry!
-  */
+ *  Thread Context for an ARM Cortex core.
+ *
+ * This is probably overkill, but the ARMCC compiler uses a lot register optimisation
+ * in its calling conventions, so better safe than sorry!
+ */
 struct PROCESSOR_TCB
 {
     uint32_t R0;
@@ -71,44 +70,44 @@ PROCESSOR_WORD_TYPE fiber_initial_stack_base()
     return DEVICE_STACK_BASE;
 }
 
-void* tcb_allocate()
+void *tcb_allocate()
 {
     return (void *)malloc(sizeof(PROCESSOR_TCB));
 }
 
 /**
-  * Configures the link register of the given tcb to have the value function.
-  *
-  * @param tcb The tcb to modify
-  * @param function the function the link register should point to.
-  */
-void tcb_configure_lr(void* tcb, PROCESSOR_WORD_TYPE function)
+ * Configures the link register of the given tcb to have the value function.
+ *
+ * @param tcb The tcb to modify
+ * @param function the function the link register should point to.
+ */
+void tcb_configure_lr(void *tcb, PROCESSOR_WORD_TYPE function)
 {
-    PROCESSOR_TCB* tcbPointer = (PROCESSOR_TCB *)tcb;
+    PROCESSOR_TCB *tcbPointer = (PROCESSOR_TCB *)tcb;
     tcbPointer->LR = function;
 }
 
 /**
-  * Configures the link register of the given tcb to have the value function.
-  *
-  * @param tcb The tcb to modify
-  * @param function the function the link register should point to.
-  */
-void tcb_configure_sp(void* tcb, PROCESSOR_WORD_TYPE sp)
+ * Configures the link register of the given tcb to have the value function.
+ *
+ * @param tcb The tcb to modify
+ * @param function the function the link register should point to.
+ */
+void tcb_configure_sp(void *tcb, PROCESSOR_WORD_TYPE sp)
 {
-    PROCESSOR_TCB* tcbPointer = (PROCESSOR_TCB *)tcb;
+    PROCESSOR_TCB *tcbPointer = (PROCESSOR_TCB *)tcb;
     tcbPointer->SP = sp;
 }
 
-void tcb_configure_stack_base(void* tcb, PROCESSOR_WORD_TYPE stack_base)
+void tcb_configure_stack_base(void *tcb, PROCESSOR_WORD_TYPE stack_base)
 {
-    PROCESSOR_TCB* tcbPointer = (PROCESSOR_TCB *)tcb;
+    PROCESSOR_TCB *tcbPointer = (PROCESSOR_TCB *)tcb;
     tcbPointer->stack_base = stack_base;
 }
 
-PROCESSOR_WORD_TYPE tcb_get_stack_base(void* tcb)
+PROCESSOR_WORD_TYPE tcb_get_stack_base(void *tcb)
 {
-    PROCESSOR_TCB* tcbPointer = (PROCESSOR_TCB *)tcb;
+    PROCESSOR_TCB *tcbPointer = (PROCESSOR_TCB *)tcb;
     return tcbPointer->stack_base;
 }
 
@@ -117,18 +116,19 @@ PROCESSOR_WORD_TYPE get_current_sp()
     return __get_MSP();
 }
 
-PROCESSOR_WORD_TYPE tcb_get_sp(void* tcb)
+PROCESSOR_WORD_TYPE tcb_get_sp(void *tcb)
 {
-    PROCESSOR_TCB* tcbPointer = (PROCESSOR_TCB *)tcb;
+    PROCESSOR_TCB *tcbPointer = (PROCESSOR_TCB *)tcb;
     return tcbPointer->SP;
 }
 
-void tcb_configure_args(void* tcb, PROCESSOR_WORD_TYPE ep, PROCESSOR_WORD_TYPE cp, PROCESSOR_WORD_TYPE pm)
+void tcb_configure_args(void *tcb, PROCESSOR_WORD_TYPE ep, PROCESSOR_WORD_TYPE cp,
+                        PROCESSOR_WORD_TYPE pm)
 {
-    PROCESSOR_TCB* tcbPointer = (PROCESSOR_TCB *)tcb;
-    tcbPointer->R0 = (uint32_t) ep;
-    tcbPointer->R1 = (uint32_t) cp;
-    tcbPointer->R2 = (uint32_t) pm;
+    PROCESSOR_TCB *tcbPointer = (PROCESSOR_TCB *)tcb;
+    tcbPointer->R0 = (uint32_t)ep;
+    tcbPointer->R1 = (uint32_t)cp;
+    tcbPointer->R2 = (uint32_t)pm;
 }
 
 extern PROCESSOR_WORD_TYPE __end__;
