@@ -166,19 +166,44 @@ int NRF52PWM::pullRequest()
     return DEVICE_OK;
 }
 
+void NRF52PWM::prefill()
+{
+    if (!dataReady)
+        return;
+
+    dataReady--;
+    if (!active) {
+        active = true;
+        nextBuffer = upstream.pull();
+        active = false;
+    } else {
+        nextBuffer = upstream.pull();
+    }
+}
+
 /**
  * Pull down a buffer from upstream, and schedule a DMA transfer from it.
  */
 int NRF52PWM::pull()
 {
-    output = upstream.pull();
-    dataReady--;
+    if (!nextBuffer.length())
+        prefill();
 
-    PWM.SEQ[0].PTR = (uint32_t) &output[0];
-    PWM.SEQ[0].CNT = output.length() / 2;
-    PWM.TASKS_SEQSTART[0] = 1;
+    buffer = nextBuffer;
+    nextBuffer = ManagedBuffer();
 
+    if (buffer.length()) {
+        PWM.SEQ[0].PTR = (uint32_t) &buffer[0];
+        PWM.SEQ[0].CNT = buffer.length() / 2;
+        PWM.TASKS_SEQSTART[0] = 1;
+    } else {
+        dataReady = 0;
+        active = false;
+        return DEVICE_OK;
+    }
+    
     active = true;
+    prefill(); // pre-fetch next buffer
 
     return DEVICE_OK;
 }
@@ -197,10 +222,15 @@ void NRF52PWM::irq()
             active = false;
 
         PWM.EVENTS_SEQEND[0] = 0;
+        // Spurious read to cover the "events don't clear immediately" erratum
+        (void) PWM.EVENTS_SEQEND[0];
     }
 
-    //Spurious read to cover the "events don't clear immediately" erratum
-    (void) PWM.EVENTS_SEQEND[1];
+    if (PWM.EVENTS_SEQEND[1])
+    {
+        PWM.EVENTS_SEQEND[1] = 0;
+        (void) PWM.EVENTS_SEQEND[1];
+    }
 }
 
 /**
