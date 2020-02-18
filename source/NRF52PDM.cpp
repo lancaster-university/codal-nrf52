@@ -102,8 +102,8 @@ NRF52PDM::NRF52PDM(Pin &sd, Pin &sck, uint16_t id) : output(*this)
     this->setGain(40);
 
 
-    // Configure buffer size.
-    NRF_PDM->SAMPLE.MAXCNT = NRF52_PDM_BUFFER_SIZE;
+    // Configure buffer size - samples are 2 bytes each
+    NRF_PDM->SAMPLE.MAXCNT = NRF52_PDM_BUFFER_SIZE / 2;
 
     // Record our sample rate for future computation.
     // This is a constant of the PDM samplerate / 64 (as defined in nrf52 specification, seciton 44).
