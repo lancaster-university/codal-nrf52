@@ -12,9 +12,6 @@ namespace codal
 {
     class NRF52Serial : public Serial
     {
-        int tx_byte_buffer;
-        int rx_byte_buffer;
-
         protected:
         virtual int enableInterrupt(SerialInterruptType t) override;
         virtual int disableInterrupt(SerialInterruptType t) override;
@@ -23,6 +20,7 @@ namespace codal
 
         public:
 
+        uint8_t rx_byte_buf_;
         nrfx_uarte_t uart_instance;
 
         /**
@@ -33,13 +31,15 @@ namespace codal
          * @param rx the pin instance to use for reception
          *
          **/
-        NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* uart);
+        NRF52Serial(Pin& tx, Pin& rx);
 
         int enable();
         int disable();
 
         virtual int putc(char) override;
         virtual int getc() override;
+
+        int write(uint8_t *buffer, int bufferLen, SerialMode mode = DEVICE_DEFAULT_SERIAL_MODE);
 
         ~NRF52Serial();
     };
