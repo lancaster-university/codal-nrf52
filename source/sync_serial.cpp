@@ -9,19 +9,27 @@ namespace codal
 
 struct SyncSerial
 {
-    NRF_SPIM_Type *device;
+    void *device;
     IRQn_Type irqn;
     SyncSerialMode modes;
 };
 
 static const SyncSerial serials[] = {
     //
-    {NRF_SPIM0, SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn, SYNC_SERIAL_MODE_ALL},
-    {NRF_SPIM1, SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1_IRQn, SYNC_SERIAL_MODE_ALL},
+    {NRF_SPIM0, SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQn, 
+        (SyncSerialMode)(SYNC_SERIAL_MODE_I2CM|SYNC_SERIAL_MODE_I2CS|
+                        SYNC_SERIAL_MODE_SPIM | SYNC_SERIAL_MODE_SPIS)},
+    {NRF_SPIM1, SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1_IRQn,
+        (SyncSerialMode)(SYNC_SERIAL_MODE_I2CM|SYNC_SERIAL_MODE_I2CS|
+                        SYNC_SERIAL_MODE_SPIM | SYNC_SERIAL_MODE_SPIS)},
     {NRF_SPIM2, SPIM2_SPIS2_SPI2_IRQn,
-     (SyncSerialMode)(SYNC_SERIAL_MODE_SPIM | SYNC_SERIAL_MODE_SPIS)},
-#ifdef NRF_SPIM3
-    {NRF_SPIM3, SPIM3_IRQn, SYNC_SERIAL_MODE_SPIM}
+        (SyncSerialMode)(SYNC_SERIAL_MODE_SPIM | SYNC_SERIAL_MODE_SPIS)},
+#if defined(NRFX_SPIM3_ENABLED)
+    {NRF_SPIM3, SPIM3_IRQn, (SyncSerialMode)SYNC_SERIAL_MODE_SPIM},
+#endif        
+    {NRF_UARTE0, UARTE0_UART0_IRQn, (SyncSerialMode)SYNC_SERIAL_MODE_UARTE},
+#if defined(NRFX_UARTE1_ENABLED)
+    {NRF_UARTE1, UARTE1_IRQn, (SyncSerialMode)SYNC_SERIAL_MODE_UARTE},
 #endif
 };
 
@@ -31,17 +39,33 @@ static PVoidCallback irq_callback[NUM_SYNC_SERIAL];
 static void *irq_callback_data[NUM_SYNC_SERIAL];
 static uint8_t used_serials;
 
+// To be able to select a specific device
+void *allocate_sync_serial(void* device)
+{
+    int i = 0;
+    while (i < NUM_SYNC_SERIAL)
+    {
+        if (!(used_serials & (1 << i)) && (serials[i].device == device))
+        {
+            used_serials |= 1 << i;
+            return serials[i].device;
+        }
+        i++;
+    }
+    return NULL;
+}
+
 void *allocate_sync_serial(SyncSerialMode mode)
 {
-    int i = NUM_SYNC_SERIAL - 1;
-    while (i >= 0)
+    int i = 0;
+    while (i < NUM_SYNC_SERIAL)
     {
         if (!(used_serials & (1 << i)) && (serials[i].modes & mode))
         {
             used_serials |= 1 << i;
             return serials[i].device;
         }
-        i--;
+        i++;
     }
     return NULL;
 }
@@ -73,7 +97,7 @@ void set_sync_serial_irq(void *device, PVoidCallback fn, void *userdata)
 DEF_IRQ(SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler, 0)
 DEF_IRQ(SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1_IRQHandler, 1)
 DEF_IRQ(SPIM2_SPIS2_SPI2_IRQHandler, 2)
-#ifdef NRF_SPIM3
+#if defined(NRFX_SPIM3_ENABLED)
 DEF_IRQ(SPIM3_IRQHandler, 3)
 #endif
 
