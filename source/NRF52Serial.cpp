@@ -25,6 +25,9 @@ void nrf_uarte_handler(nrfx_uarte_event_t const * p_event, void * p_context)
 
 int NRF52Serial::enableInterrupt(SerialInterruptType t)
 {
+    if(is_configured_ == false)
+        return DEVICE_INVALID_STATE;
+
     if(t == TxInterrupt){
         if(!nrfx_uarte_tx_in_progress(&uart_instance)){
             uart_instance.p_reg->INTENSET = (NRF_UARTE_INT_ENDTX_MASK |
@@ -51,6 +54,9 @@ int NRF52Serial::enableInterrupt(SerialInterruptType t)
 
 int NRF52Serial::disableInterrupt(SerialInterruptType t)
 {
+    if(is_configured_ == false)
+        return DEVICE_INVALID_STATE;
+
     if (t == TxInterrupt){
         uart_instance.p_reg->INTENCLR = (NRF_UARTE_INT_ENDTX_MASK |
                                          NRF_UARTE_INT_TXSTOPPED_MASK);
@@ -66,6 +72,9 @@ int NRF52Serial::disableInterrupt(SerialInterruptType t)
 
 int NRF52Serial::setBaudrate(uint32_t baudrate)
 {
+    if(is_configured_ == false)
+        return DEVICE_INVALID_STATE;
+
     nrf_uarte_baudrate_t baud = NRF_UARTE_BAUDRATE_115200;
 
     switch(baudrate)
@@ -85,14 +94,64 @@ int NRF52Serial::setBaudrate(uint32_t baudrate)
 
 int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 {
+    int ret;
+
     this->tx = tx;
     this->rx = rx;
-    nrf_uarte_txrx_pins_set(uart_instance.p_reg, tx.name, rx.name);
-    return DEVICE_OK;
+
+    if(uart_instance.p_reg == NULL){
+        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_sync_serial(SYNC_SERIAL_MODE_UARTE);
+    }
+
+    if(uart_instance.p_reg != NULL){
+        if(is_configured_ == true){
+            nrf_uarte_txrx_pins_set(uart_instance.p_reg, tx.name, rx.name);
+        }else{
+            if(uart_instance.p_reg == NRF_UARTE0){
+                uart_instance.drv_inst_idx = NRFX_UARTE0_INST_IDX;
+            }
+        #if defined(NRFX_UARTE1_ENABLED)
+            else if(uart_instance.p_reg == NRF_UARTE1){
+                uart_instance.drv_inst_idx = NRFX_UARTE1_INST_IDX;
+            }
+        #endif
+
+            nrfx_uarte_config_t uart_config;
+            uart_config.pseltxd = (uint32_t) tx.name;
+            uart_config.pselrxd = (uint32_t) rx.name;
+            uart_config.pselcts = 0xFFFFFFFF;
+            uart_config.pselrts = 0xFFFFFFFF;
+            uart_config.p_context = this;
+            uart_config.baudrate = NRF_UARTE_BAUDRATE_115200;
+            uart_config.interrupt_priority = 1;
+
+            nrf_uarte_config_t hal_config;
+            hal_config.hwfc = NRF_UARTE_HWFC_DISABLED;
+            hal_config.parity = NRF_UARTE_PARITY_EXCLUDED;
+        #if defined(UARTE_CONFIG_STOP_Msk)    
+            hal_config.stop = NRF_UARTE_STOP_ONE;
+        #endif    
+        #if defined(UARTE_CONFIG_PARITYTYPE_Msk)
+            hal_config.paritytype = NRF_UARTE_PARITYTYPE_EVEN;
+        #endif
+
+            uart_config.hal_cfg = hal_config;
+
+            nrfx_uarte_init(&uart_instance, &uart_config, nrf_uarte_handler);            
+        }
+        is_configured_ = true;
+        ret = DEVICE_OK;
+    }else{
+        ret = DEVICE_NO_RESOURCES;
+    }
+    
+    return ret;
 }
 
 int NRF52Serial::putc(char c)
 {
+    if(is_configured_ == false)
+        return DEVICE_INVALID_STATE;
     // Added because serial class functions, including printf, require blocking.
     while(nrfx_uarte_tx_in_progress(&uart_instance));
 
@@ -110,11 +169,16 @@ int NRF52Serial::putc(char c)
 
 int NRF52Serial::getc()
 {
+    if(is_configured_ == false)
+        return DEVICE_INVALID_STATE;
+
     return this->getChar(codal::SerialMode::ASYNC);
 }
 
 int NRF52Serial::write(uint8_t *buffer, int bufferLen, SerialMode mode)
 {
+    if(is_configured_ == false)
+        return DEVICE_INVALID_STATE;    
     if(txInUse())
         return DEVICE_SERIAL_IN_USE;
 
@@ -145,6 +209,12 @@ int NRF52Serial::write(uint8_t *buffer, int bufferLen, SerialMode mode)
     return res;    
 }
 
+bool NRF52Serial::isConfigured() const
+{
+    return is_configured_;
+}
+
+
 /**
  * Constructor
  *
@@ -153,48 +223,17 @@ int NRF52Serial::write(uint8_t *buffer, int bufferLen, SerialMode mode)
  * @param rx the pin instance to use for reception
  *
  **/
-NRF52Serial::NRF52Serial(Pin& tx, Pin& rx) 
- : Serial(tx, rx), rx_byte_buf_(0)
+NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* uart) 
+ : Serial(tx, rx), is_configured_(false), rx_byte_buf_(0)
 {
-    memset(&this->uart_instance, 0, sizeof(nrfx_uarte_t));
-    
-    this->uart_instance.p_reg = (NRF_UARTE_Type*)allocate_sync_serial(SYNC_SERIAL_MODE_UARTE);
-    
-    if(this->uart_instance.p_reg == NRF_UARTE0){
-        this->uart_instance.drv_inst_idx = NRFX_UARTE0_INST_IDX;
+    memset(&uart_instance, 0, sizeof(nrfx_uarte_t));
+    if(uart != NULL){
+        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_sync_serial((void*)uart);
     }
-#if defined(NRFX_UARTE1_ENABLED)
-    else if(this->uart_instance.p_reg == NRF_UARTE1){
-        this->uart_instance.drv_inst_idx = NRFX_UARTE1_INST_IDX;
-    }
-#endif
-
-    nrfx_uarte_config_t uart_config;
-
-    uart_config.pseltxd = (uint32_t) tx.name;
-    uart_config.pselrxd = (uint32_t) rx.name;
-    uart_config.pselcts = 0xFFFFFFFF;
-    uart_config.pselrts = 0xFFFFFFFF;
-    uart_config.p_context = this;
-    uart_config.baudrate = NRF_UARTE_BAUDRATE_115200;
-    uart_config.interrupt_priority = 1;
-
-    nrf_uarte_config_t hal_config;
-    hal_config.hwfc = NRF_UARTE_HWFC_DISABLED;
-    hal_config.parity = NRF_UARTE_PARITY_EXCLUDED;
-#if defined(UARTE_CONFIG_STOP_Msk)    
-    hal_config.stop = NRF_UARTE_STOP_ONE;
-#endif    
-#if defined(UARTE_CONFIG_PARITYTYPE_Msk)
-    hal_config.paritytype = NRF_UARTE_PARITYTYPE_EVEN;
-#endif
-
-    uart_config.hal_cfg = hal_config;
-
-    nrfx_uarte_init(&this->uart_instance, &uart_config, nrf_uarte_handler);
+    configurePins(tx,rx);
 }
 
 NRF52Serial::~NRF52Serial()
 {
-    nrfx_uarte_uninit(&this->uart_instance);
+    nrfx_uarte_uninit(&uart_instance);
 }
