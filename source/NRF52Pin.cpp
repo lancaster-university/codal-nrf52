@@ -756,21 +756,25 @@ bool NRF52Pin::isHighDrive()
     return (s == 0x00000300);
 }
 
-int NRF52Pin::conditionalSetDigitalValue(int value, volatile uint32_t *condition)
+int NRF52Pin::getAndSetDigitalValue(int value)
 {
-    if (*condition == 0) return DEVICE_BUSY;
-
     uint32_t mask = 1 << PIN;
-    // set the value
-    if (value)
-        PORT->OUTSET = mask;
-    else
-        PORT->OUTCLR = mask;
 
     if ((PORT->DIR & mask) == 0)
     {
+        // set the value
+        if (value)
+            PORT->OUTSET = mask;
+        else
+            PORT->OUTCLR = mask;
+
         // pin in input mode, do the "atomic" set
-        PORT->DIRSET = mask & *condition;
+        if (value)
+            // 0 -> 1, only set when IN==0
+            PORT->DIRSET = ~PORT->IN & mask;
+        else
+            // 1 -> 0, only set when IN==1
+            PORT->DIRSET = PORT->IN & mask;
 
         if (PORT->DIR & mask) {
             disconnect();
