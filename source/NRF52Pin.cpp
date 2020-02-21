@@ -704,6 +704,7 @@ int NRF52Pin::eventOn(int eventType)
 {
     switch(eventType)
     {
+        case DEVICE_PIN_INTERRUPT_ON_EDGE:
         case DEVICE_PIN_EVENT_ON_EDGE:
         case DEVICE_PIN_EVENT_ON_PULSE:
             enableRiseFallEvents(eventType);
