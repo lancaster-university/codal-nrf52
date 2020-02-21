@@ -61,7 +61,7 @@ void GPIOTE_IRQHandler(void)
     if (NRF_GPIOTE->EVENTS_PORT && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
     {
         NRF_GPIOTE->EVENTS_PORT = 0;
-        for (uint8_t i = 0; i < 31; i++)
+        for (uint8_t i = 0; i <= 31; i++)
         {
             if (interrupt_enable & (1 << i) && irq_pins[i] && NRF_P0->LATCH & (1 << i))
             {
@@ -753,4 +753,37 @@ bool NRF52Pin::isHighDrive()
     uint32_t s = PORT->PIN_CNF[PIN] & 0x00000700;
 
     return (s == 0x00000300);
+}
+
+int NRF52Pin::isOutput()
+{
+    return (PORT->DIR & (1 << PIN)) != 0 || (status & (IO_STATUS_DIGITAL_OUT | IO_STATUS_ANALOG_OUT)) != 0;
+}
+
+int NRF52Pin::conditionalSetDigitalValue(int value, volatile uint32_t *condition)
+{
+    if (*condition == 0) return DEVICE_BUSY;
+
+    uint32_t mask = 1 << PIN;
+    // set the value
+    if (value)
+        PORT->OUTSET = mask;
+    else
+        PORT->OUTCLR = mask;
+
+    if ((PORT->DIR & mask) == 0)
+    {
+        // pin in input mode, do the "atomic" set
+        PORT->DIRSET = mask & *condition;
+
+        if (PORT->DIR & mask) {
+            disconnect();
+            setDigitalValue(value); // make sure 'status' is updated
+            return 0;
+        } else {
+            return DEVICE_BUSY;
+        }
+    }
+
+    return 0;
 }

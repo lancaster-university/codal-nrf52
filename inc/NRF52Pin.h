@@ -351,6 +351,25 @@ namespace codal
          * @return true if HIGH DRIVE is enabled on this pin, false otherwise
          */
         bool isHighDrive();
+
+        /**
+          * Determines if this IO pin is currently configured as an output.
+          *
+          * @return 1 if pin is an analog or digital output, 0 otherwise.
+          */
+        virtual int isOutput() override;
+
+        /**
+         * Set pin value if condition is set.
+         * 
+         * If *condition is 0xffffffff, sets pin to given value.
+         * If *condition is 0, do nothing.
+         * Otherwise, undefined.
+         * Note, that this is overwritten in hardware-specific classes to check the condition immedietly before changing the pin value.
+         * 
+         * @return DEVICE_OK on sucess, DEVICE_BUSY when condition was false.
+         */
+        virtual int conditionalSetDigitalValue(int value, volatile uint32_t *condition) override;
     };
 }
 
