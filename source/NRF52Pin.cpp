@@ -389,7 +389,7 @@ int NRF52Pin::isInput()
   */
 int NRF52Pin::isOutput()
 {
-    return (status & (IO_STATUS_DIGITAL_OUT | IO_STATUS_ANALOG_OUT)) == 0 ? 0 : 1;
+    return (PORT->DIR & (1 << PIN)) != 0 || (status & (IO_STATUS_DIGITAL_OUT | IO_STATUS_ANALOG_OUT)) != 0;
 }
 
 /**
@@ -753,11 +753,6 @@ bool NRF52Pin::isHighDrive()
     uint32_t s = PORT->PIN_CNF[PIN] & 0x00000700;
 
     return (s == 0x00000300);
-}
-
-int NRF52Pin::isOutput()
-{
-    return (PORT->DIR & (1 << PIN)) != 0 || (status & (IO_STATUS_DIGITAL_OUT | IO_STATUS_ANALOG_OUT)) != 0;
 }
 
 int NRF52Pin::conditionalSetDigitalValue(int value, volatile uint32_t *condition)

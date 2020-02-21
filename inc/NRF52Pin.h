@@ -353,13 +353,6 @@ namespace codal
         bool isHighDrive();
 
         /**
-          * Determines if this IO pin is currently configured as an output.
-          *
-          * @return 1 if pin is an analog or digital output, 0 otherwise.
-          */
-        virtual int isOutput() override;
-
-        /**
          * Set pin value if condition is set.
          * 
          * If *condition is 0xffffffff, sets pin to given value.
