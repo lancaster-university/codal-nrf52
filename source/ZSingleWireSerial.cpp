@@ -47,13 +47,18 @@ void UARTE0_UART0_IRQHandler()
         ZSingleWireSerial::instance->configureTxInterrupt(0);
         eventValue = SWS_EVT_DATA_SENT;
     }
-    else if (NRF_UARTE0->EVENTS_ERROR && (NRF_UARTE0->INTENSET & UARTE_INTENSET_ERROR_Msk))
+    else if (NRF_UARTE0->EVENTS_ERROR && (NRF_UARTE0->INTEN & UARTE_INTENSET_ERROR_Msk))
     {
         NRF_UARTE0->EVENTS_ERROR = 0;
-        DMESG("ERR %d", NRF_UARTE0->ERRORSRC);
+        // if we're in reception mode, stop it (error doesn't automatically do so)
+        NRF_UARTE0->TASKS_STOPRX = 1;
+        while (NRF_UARTE0->TASKS_STOPRX);
         // clear error src
         NRF_UARTE0->ERRORSRC = NRF_UARTE0->ERRORSRC;
-        eventValue = SWS_EVT_ERROR;
+        // don't wait for ENDRX event, it takes additional 50uS to arrive
+        ZSingleWireSerial::instance->configureRxInterrupt(0);
+        eventValue = SWS_EVT_DATA_RECEIVED;
+        //eventValue = SWS_EVT_ERROR;
     }
 
     if (eventValue > 0)
@@ -72,17 +77,17 @@ void ZSingleWireSerial::configureRxInterrupt(int enable)
 {
     if (enable)
         // for some reason RXD RDY event is not provided in the definitions (0x2)
-        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ERROR_Msk | 0x2);
+        NRF_UARTE0->INTENSET = (UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ERROR_Msk | 0x2);
     else
-        NRF_UARTE0->INTENCLR |= (UARTE_INTENCLR_ENDRX_Msk |  0x2);
+        NRF_UARTE0->INTENCLR = (UARTE_INTENCLR_ENDRX_Msk | UARTE_INTENSET_ERROR_Msk | 0x2);
 }
 
 void ZSingleWireSerial::configureTxInterrupt(int enable)
 {
     if (enable)
-        NRF_UARTE0->INTENSET |= (UARTE_INTENSET_ENDTX_Msk | UARTE_INTENSET_ERROR_Msk);
+        NRF_UARTE0->INTENSET = (UARTE_INTENSET_ENDTX_Msk);
     else
-        NRF_UARTE0->INTENCLR |= (UARTE_INTENCLR_ENDTX_Msk);
+        NRF_UARTE0->INTENCLR = (UARTE_INTENCLR_ENDTX_Msk);
 }
 
 int ZSingleWireSerial::configureTx(int enable)
@@ -120,6 +125,7 @@ int ZSingleWireSerial::configureRx(int enable)
         NRF_UARTE0->PSEL.RXD = p.name;
         NRF_UARTE0->EVENTS_ENDRX = 0;
         NRF_UARTE0->EVENTS_ERROR = 0;
+        NRF_UARTE0->ERRORSRC = NRF_UARTE0->ERRORSRC;
         NRF_UARTE0->ENABLE = 8;
         while(!(NRF_UARTE0->ENABLE));
         status |= RX_CONFIGURED;
