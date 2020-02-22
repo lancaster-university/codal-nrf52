@@ -95,7 +95,7 @@ int ZSingleWireSerial::configureTx(int enable)
     if (enable && !(status & TX_CONFIGURED))
     {
         NRF_P0->DIR |= (1 << p.name);
-        NRF_P0->PIN_CNF[p.name] =  3 << 2;
+        NRF_P0->PIN_CNF[p.name] =  3 << 2; // this overrides DIR setting above
         NRF_UARTE0->PSEL.TXD = p.name;
         NRF_UARTE0->EVENTS_ENDTX = 0;
         NRF_UARTE0->ENABLE = 8;
@@ -121,7 +121,7 @@ int ZSingleWireSerial::configureRx(int enable)
     if (enable && !(status & RX_CONFIGURED))
     {
         NRF_P0->DIR &= ~(1 << p.name);
-        NRF_P0->PIN_CNF[p.name] =  3 << 2;
+        NRF_P0->PIN_CNF[p.name] =  3 << 2; // this overrides DIR setting above
         NRF_UARTE0->PSEL.RXD = p.name;
         NRF_UARTE0->EVENTS_ENDRX = 0;
         NRF_UARTE0->EVENTS_ERROR = 0;
