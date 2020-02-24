@@ -32,7 +32,7 @@ __attribute__((noinline)) static void neopixel_send_buffer(Pin &pin, const uint8
     uint32_t mask = 0x80;
     int i = 0;
 
-    __disable_irq();
+    target_disable_irq();
     uint32_t phase = DWT->CYCCNT;
     for (;;)
     {
@@ -61,7 +61,7 @@ __attribute__((noinline)) static void neopixel_send_buffer(Pin &pin, const uint8
         while (DWT->CYCCNT < phase)
             ;
     }
-    __enable_irq();
+    target_enable_irq();
 }
 
 #endif // CODAL_NEOPIXEL_H
