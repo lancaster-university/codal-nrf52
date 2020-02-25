@@ -175,6 +175,13 @@ int NRF52Pin::setDigitalValue(int value)
     if(!(PIN_CAPABILITY_DIGITAL & capability))
         return DEVICE_NOT_SUPPORTED;
 
+    // Write the value, before setting as output - this way the pin state update will be atomic    
+    if (value)
+        PORT->OUTSET = 1 << PIN;
+    else
+        PORT->OUTCLR = 1 << PIN;
+
+
     // Move into a Digital output state if necessary.
     if (!(status & IO_STATUS_DIGITAL_OUT))
     {
@@ -194,12 +201,6 @@ int NRF52Pin::setDigitalValue(int value)
         // Record our mode, so we can optimise later.
         status |= IO_STATUS_DIGITAL_OUT;
     }
-
-    // Write the value.
-    if (value)
-        PORT->OUTSET = 1 << PIN;
-    else
-        PORT->OUTCLR = 1 << PIN;
 
     return DEVICE_OK;
 }
@@ -781,6 +782,7 @@ int NRF52Pin::getAndSetDigitalValue(int value)
             setDigitalValue(value); // make sure 'status' is updated
             return 0;
         } else {
+
             return DEVICE_BUSY;
         }
     }
