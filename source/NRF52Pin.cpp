@@ -757,6 +757,18 @@ bool NRF52Pin::isHighDrive()
     return (s == 0x00000300);
 }
 
+__attribute__((noinline))
+static void get_and_set(NRF_GPIO_Type *port, uint32_t mask) {
+    // 0 -> 1, only set when IN==0
+    port->DIRSET = ~port->IN & mask;
+}
+
+__attribute__((noinline))
+static void get_and_clr(NRF_GPIO_Type *port, uint32_t mask) {
+    // 1 -> 0, only set when IN==1
+    port->DIRSET = port->IN & mask;
+}
+
 int NRF52Pin::getAndSetDigitalValue(int value)
 {
     uint32_t mask = 1 << PIN;
@@ -771,11 +783,9 @@ int NRF52Pin::getAndSetDigitalValue(int value)
 
         // pin in input mode, do the "atomic" set
         if (value)
-            // 0 -> 1, only set when IN==0
-            PORT->DIRSET = ~PORT->IN & mask;
+            get_and_set(PORT, mask);
         else
-            // 1 -> 0, only set when IN==1
-            PORT->DIRSET = PORT->IN & mask;
+            get_and_clr(PORT, mask);
 
         if (PORT->DIR & mask) {
             disconnect();
