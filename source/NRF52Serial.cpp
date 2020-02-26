@@ -1,5 +1,5 @@
 #include "NRF52Serial.h"
-#include "sync_serial.h"
+#include "peripheral_alloc.h"
 #include "NotifyEvents.h"
 
 using namespace codal;
@@ -100,7 +100,7 @@ int NRF52Serial::configurePins(Pin& tx, Pin& rx)
     this->rx = rx;
 
     if(uart_instance.p_reg == NULL){
-        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_sync_serial(SYNC_SERIAL_MODE_UARTE);
+        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_peripheral(PERI_MODE_UARTE);
     }
 
     if(uart_instance.p_reg != NULL){
@@ -214,7 +214,6 @@ bool NRF52Serial::isConfigured() const
     return is_configured_;
 }
 
-
 /**
  * Constructor
  *
@@ -223,13 +222,12 @@ bool NRF52Serial::isConfigured() const
  * @param rx the pin instance to use for reception
  *
  **/
-NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* uart) 
+NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
  : Serial(tx, rx), is_configured_(false), rx_byte_buf_(0)
 {
     memset(&uart_instance, 0, sizeof(nrfx_uarte_t));
-    if(uart != NULL){
-        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_sync_serial((void*)uart);
-    }
+    if(device != NULL)
+        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
     configurePins(tx,rx);
 }
 

@@ -45,7 +45,7 @@ public:
     /**
      * Constructor.
      */
-    NRF52I2C(NRF52Pin &sda, NRF52Pin &scl);
+    NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device = NULL);
 
     /** Set the frequency of the I2C interface
      *

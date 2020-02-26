@@ -1,7 +1,7 @@
 #include "NRF52I2C.h"
 #include "codal_target_hal.h"
 #include "CodalDmesg.h"
-#include "sync_serial.h"
+#include "peripheral_alloc.h"
 
 using namespace codal;
 
@@ -10,9 +10,13 @@ using namespace codal;
 /**
  * Constructor.
  */
-NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl) : codal::I2C(sda, scl), sda(sda), scl(scl)
+NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal::I2C(sda, scl), sda(sda), scl(scl)
 {
-    p_twim = (NRF_TWIM_Type *)allocate_sync_serial(SYNC_SERIAL_MODE_I2CM);
+    if(device == NULL)
+        p_twim = (NRF_TWIM_Type *)allocate_peripheral(PERI_MODE_I2CM);
+    else
+        p_twim = (NRF_TWIM_Type *)allocate_peripheral((void *)device);
+    
     if (!p_twim)
         target_panic(DEVICE_HARDWARE_CONFIGURATION_ERROR);
 
