@@ -66,7 +66,7 @@ public:
      *
      * Default setup is 1 MHz, 8 bit, mode 0.
      */
-    NRF52SPI(codal::Pin &mosi, codal::Pin &miso, codal::Pin &sclk);
+    NRF52SPI(codal::Pin &mosi, codal::Pin &miso, codal::Pin &sclk, NRF_SPIM_Type* device = NULL);
 
     /** Set the frequency of the SPI interface
      *
