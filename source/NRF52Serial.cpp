@@ -4,6 +4,28 @@
 
 using namespace codal;
 
+/**
+ * Constructor
+ *
+ * @param tx the pin instance to use for transmission
+ *
+ * @param rx the pin instance to use for reception
+ *
+ **/
+NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
+ : Serial(tx, rx), is_configured_(false), rx_byte_buf_(0)
+{
+    memset(&uart_instance, 0, sizeof(nrfx_uarte_t));
+    if(device != NULL)
+        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
+    configurePins(tx,rx);
+}
+
+NRF52Serial::~NRF52Serial()
+{
+    nrfx_uarte_uninit(&uart_instance);
+}
+
 void nrf_uarte_handler(nrfx_uarte_event_t const * p_event, void * p_context)
 {
     if (p_context == NULL)
@@ -212,26 +234,4 @@ int NRF52Serial::write(uint8_t *buffer, int bufferLen, SerialMode mode)
 bool NRF52Serial::isConfigured() const
 {
     return is_configured_;
-}
-
-/**
- * Constructor
- *
- * @param tx the pin instance to use for transmission
- *
- * @param rx the pin instance to use for reception
- *
- **/
-NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
- : Serial(tx, rx), is_configured_(false), rx_byte_buf_(0)
-{
-    memset(&uart_instance, 0, sizeof(nrfx_uarte_t));
-    if(device != NULL)
-        uart_instance.p_reg = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
-    configurePins(tx,rx);
-}
-
-NRF52Serial::~NRF52Serial()
-{
-    nrfx_uarte_uninit(&uart_instance);
 }
