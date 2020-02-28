@@ -46,9 +46,8 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     // Configure for a single pass over the data
     PWM.LOOP = 0;
 
-    // For now, we just support a two channel grouped mode.
-    // TODO: Fix this to support all modes.
-    PWM.DECODER = (PWM_DECODER_LOAD_Grouped << PWM_DECODER_LOAD_Pos ) | (PWM_DECODER_MODE_RefreshCount << PWM_DECODER_MODE_Pos );
+    // By default, enable control of four independent channels
+    setDecoderMode(PWM_DECODER_LOAD_Individual);
 
     // Configure PWM for
     PWM.SEQ[1].REFRESH = 0;
@@ -153,6 +152,37 @@ int NRF52PWM::setSampleRate(int frequency)
     return DEVICE_OK;
 }
 
+/** 
+ * Defines the mode in which the PWM module will operate, in terms of how it interprets data provided from the DataSource:
+ * Valid options are:
+ * 
+ * PWM_DECODER_LOAD_Common          1st half word (16-bit) used in all PWM channels 0..3 
+ * PWM_DECODER_LOAD_Grouped         1st half word (16-bit) used in channel 0..1; 2nd word in channel 2..3
+ * PWM_DECODER_LOAD_Individual      1st half word (16-bit) in ch.0; 2nd in ch.1; ...; 4th in ch.3 
+ * PWM_DECODER_LOAD_WaveForm        1st half word (16-bit) in ch.0; 2nd in ch.1; ...; 4th in COUNTERTOP
+ * 
+ * (See nrf52 product specificaiton for more details)
+ * 
+ * @param mode The mode for this PWM module to use.
+ * @return DEVICE_OK, or DEVICE_INVALID_PARAMETER.
+ */
+int NRF52PWM::setDecoderMode(uint32_t mode)
+{
+    PWM.DECODER = (mode << PWM_DECODER_LOAD_Pos ) | (PWM_DECODER_MODE_RefreshCount << PWM_DECODER_MODE_Pos );
+
+    return DEVICE_OK;
+}
+ 
+/**
+ * Defines if the PWM modules should repeat the previous sample when the end of the stream is reached.
+ * 
+ * @ param repeat if true, the last PWM sample received is repeated if the stream underflows. If false, the PWM module will stop processing on stream underflow.
+ */
+void setLoop(bool repeat)
+{
+    //TODO
+}
+
 /**
  * Callback provided when data is ready.
  */
@@ -195,6 +225,7 @@ int NRF52PWM::pull()
     if (buffer.length()) {
         PWM.SEQ[0].PTR = (uint32_t) &buffer[0];
         PWM.SEQ[0].CNT = buffer.length() / 2;
+        active = true;
         PWM.TASKS_SEQSTART[0] = 1;
     } else {
         dataReady = 0;
@@ -202,7 +233,6 @@ int NRF52PWM::pull()
         return DEVICE_OK;
     }
     
-    active = true;
     prefill(); // pre-fetch next buffer
 
     return DEVICE_OK;
@@ -259,12 +289,6 @@ NRF52PWM::connectPin(Pin &pin, int channel)
 {
     pin.setDigitalValue(0);
     PWM.PSEL.OUT[channel] = pin.name;
-
-    // HACK: Enter high drive mode. This should move to specific Pin class...
-    // A setMode(enum) to turn on off arbitrary stuff would be cool?
-    uint32_t s = NRF_GPIO->PIN_CNF[pin.name] & 0xfffff8ff;
-    s |= 0x00000300;
-    NRF_GPIO->PIN_CNF[pin.name] = s;
 
     return DEVICE_OK;
 }
