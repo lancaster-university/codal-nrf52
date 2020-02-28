@@ -70,6 +70,12 @@ public:
      */
     int setSampleRate(int frequency);
 
+    /**
+     * Change the DAC playback sample rate to the given period.
+     * @param period The new sample playback period, in microseconds.
+     */
+    int setPeriodUs(int period);
+
     /** 
      * Defines the mode in which the PWM module will operate, in terms of how it interprets data provided from the DataSource:
      * Valid options are:

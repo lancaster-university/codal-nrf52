@@ -120,20 +120,22 @@ int NRF52PWM::getSampleRange()
  */
 int NRF52PWM::setSampleRate(int frequency)
 {
-    int period_ticks;
+    return setPeriodUs(1000000 / frequency);
+}
+
+/**
+ * Change the DAC playback sample rate to the given period.
+ * @param period The new sample playback period, in microseconds.
+ */
+int NRF52PWM::setPeriodUs(int period)
+{
     int prescaler = 0;
     int clock_frequency = 16000000;
+    int period_ticks = (clock_frequency/1000000) * period;
 
-    // Calculate the necessary prescaler for this frequency
-    while (prescaler <= 8)
-    {
-        period_ticks = (clock_frequency >> prescaler) / frequency;
-
-        if (period_ticks > 0 && period_ticks < 32767)
-            break;
-
+    // Calculate necessary prescaler.
+    while(period_ticks >> prescaler >= 32768)
         prescaler++;
-    }
 
     // If the sample rate requested is outside the range of what the hardware can achieve, then there's nothign we can do.
     if (prescaler > 7)
@@ -147,7 +149,7 @@ int NRF52PWM::setSampleRate(int frequency)
     PWM.COUNTERTOP = period_ticks;
 
     // Update our internal record to reflect an accurate (probably rounded) samplerate.
-    sampleRate =  (clock_frequency / (prescaler+1)) / period_ticks;
+    sampleRate = (clock_frequency / (prescaler+1)) / period_ticks;
 
     return DEVICE_OK;
 }
