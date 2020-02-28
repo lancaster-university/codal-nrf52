@@ -53,6 +53,13 @@ volatile uint32_t interrupt_enable = 0;
 
 static NRF52Pin *irq_pins[NUM_PINS];
 
+MemorySource* NRF52Pin::pwmSource = NULL;
+NRF52PWM* NRF52Pin::pwm = NULL;
+uint16_t NRF52Pin::pwmBuffer[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {0,0,0,0};
+int8_t NRF52Pin::pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {-1,-1,-1,-1};
+uint8_t NRF52Pin::lastUsedChannel = 3;
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -255,17 +262,18 @@ int NRF52Pin::getDigitalValue(PullMode pull)
     setPull(pull);
     return getDigitalValue();
 }
-
-int NRF52Pin::obtainAnalogChannel()
+/**
+ * Instantiates the components required for PWM if not previously created
+ */
+int NRF52Pin::initialisePWM()
 {
-    // Move into an analogue input state if necessary, if we are no longer the focus of a DynamicPWM instance, allocate ourselves again!
-    // if (!(status & IO_STATUS_ANALOG_OUT) || !(((DynamicPwm *)pin)->getPinName() == name)){
-    //     disconnect();
-    //     pin = new DynamicPwm((PinName)name);
-    //     status |= IO_STATUS_ANALOG_OUT;
-    // }
+    if (pwmSource == NULL)
+        pwmSource = new MemorySource(65535);
 
-    return DEVICE_NOT_IMPLEMENTED;
+    if (pwm == NULL)
+        pwm = new NRF52PWM(NRF_PWM0, pwmSource->output, 1600);
+
+    return DEVICE_OK;
 }
 
 /**
@@ -279,21 +287,40 @@ int NRF52Pin::obtainAnalogChannel()
 int NRF52Pin::setAnalogValue(int value)
 {
     // //check if this pin has an analogue mode...
-    // if(!(PIN_CAPABILITY_DIGITAL & capability))
-    //     return DEVICE_NOT_SUPPORTED;
-
+     if(!(PIN_CAPABILITY_ANALOG & capability))
+         return DEVICE_NOT_SUPPORTED;
+    
     // //sanitise the level value
-    // if(value < 0 || value > DEVICE_PIN_MAX_OUTPUT)
-    //     return DEVICE_INVALID_PARAMETER;
+    if(value < 0 || value > DEVICE_PIN_MAX_OUTPUT)
+         return DEVICE_INVALID_PARAMETER;
 
-    // float level = (float)value / float(DEVICE_PIN_MAX_OUTPUT);
+    int channel = -1;
 
-    // //obtain use of the DynamicPwm instance, if it has changed / configure if we do not have one
-    // if(obtainAnalogChannel() == DEVICE_OK)
-    //     return ((DynamicPwm *)pin)->write(level);
+    // find existing channel
+    for (int i = 0; i < NRF52PIN_PWM_CHANNEL_MAP_SIZE; i++)
+        if (pwmChannelMap[i] == name)
+            channel = i;
 
-    // return DEVICE_OK;
-    return DEVICE_NOT_IMPLEMENTED;
+    // no existing channel found
+    if (channel == -1)
+    {
+        initialisePWM();
+
+        // alloc new channel by round robin allocation
+        channel = (lastUsedChannel + 1) % NRF52PIN_PWM_CHANNEL_MAP_SIZE;
+        pwmChannelMap[channel] = name;
+        lastUsedChannel = channel;
+        pwm->connectPin(*this, channel);
+    }
+
+    status |= IO_STATUS_ANALOG_OUT;
+
+    // set new value
+    pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (float)value / (float)DEVICE_PIN_MAX_OUTPUT);
+
+    pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
+
+    return DEVICE_OK;
 }
 
 /**
@@ -460,26 +487,12 @@ int NRF52Pin::isTouched()
   */
 int NRF52Pin::setServoPulseUs(int pulseWidth)
 {
-    // //check if this pin has an analogue mode...
-    // if(!(PIN_CAPABILITY_ANALOG & capability))
-    //     return DEVICE_NOT_SUPPORTED;
+    initialisePWM();
 
-    // //sanitise the pulse width
-    // if(pulseWidth < 0)
-    //     return DEVICE_INVALID_PARAMETER;
-
-    // //Check we still have the control over the DynamicPwm instance
-    // if(obtainAnalogChannel() == DEVICE_OK)
-    // {
-    //     //check if the period is set to 20ms
-    //     if(((DynamicPwm *)pin)->getPeriodUs() != DEVICE_DEFAULT_PWM_PERIOD)
-    //         ((DynamicPwm *)pin)->setPeriodUs(DEVICE_DEFAULT_PWM_PERIOD);
-
-    //     ((DynamicPwm *)pin)->pulsewidth_us(pulseWidth);
-    // }
-
-    // return DEVICE_OK;
-    return DEVICE_NOT_IMPLEMENTED;
+    if (pwm->getPeriodUs() != 20000)
+        pwm->setPeriodUs(20000);
+ 
+    return setAnalogPeriodUs(pulseWidth);
 }
 
 /**
@@ -491,18 +504,27 @@ int NRF52Pin::setServoPulseUs(int pulseWidth)
   */
 int NRF52Pin::setAnalogPeriodUs(int period)
 {
-    // int ret;
+    if (status & IO_STATUS_ANALOG_OUT)
+    {
+        int oldRange = pwm->getSampleRange();
+        pwm->setPeriodUs(period);
 
-    // if (!(status & IO_STATUS_ANALOG_OUT))
-    // {
-    //     // Drop this pin into PWM mode, but with a LOW value.
-    //     ret = setAnalogValue(0);
-    //     if (ret != DEVICE_OK)
-    //         return ret;
-    // }
+        for (int i = 0; i < NRF52PIN_PWM_CHANNEL_MAP_SIZE; i++)
+        {
+            float v = (float) pwmBuffer[i];
+            v = v * (float)pwm->getSampleRange();
+            v = v / (float) oldRange;
+             
+            pwmBuffer[i] = (uint16_t) v;
+        }
 
-    // return ((DynamicPwm *)pin)->setPeriodUs(period);
-    return DEVICE_NOT_IMPLEMENTED;
+        pwmSource->setMaximumSampleValue(pwm->getSampleRange());
+        pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
+
+        return DEVICE_OK;
+    }
+    
+    return DEVICE_NOT_SUPPORTED;
 }
 
 /**
@@ -526,11 +548,10 @@ int NRF52Pin::setAnalogPeriod(int period)
   */
 uint32_t NRF52Pin::getAnalogPeriodUs()
 {
-    // if (!(status & IO_STATUS_ANALOG_OUT))
-    //     return DEVICE_NOT_SUPPORTED;
+    if (status & IO_STATUS_ANALOG_OUT)
+        return pwm->getPeriodUs();
 
-    // return ((DynamicPwm *)pin)->getPeriodUs();
-    return DEVICE_NOT_IMPLEMENTED;
+    return DEVICE_NOT_SUPPORTED;
 }
 
 /**
