@@ -23,6 +23,7 @@ private:
     bool            active;
     int             dataReady;
     int             sampleRate;
+    int             periodUs;
 
     void prefill();
 
@@ -69,6 +70,13 @@ public:
      * @param frequency The new sample playback frequency.
      */
     int setSampleRate(int frequency);
+
+    /**
+     * Determine the current DAC playback period.
+     * @return period The sample playback period, in microseconds.
+     */
+    int getPeriodUs();
+
 
     /**
      * Change the DAC playback sample rate to the given period.

@@ -146,13 +146,27 @@ int NRF52PWM::setPeriodUs(int period)
 
     // Decrement prescaler, as hardware indexes from zero.
     PWM.PRESCALER = prescaler;
-    PWM.COUNTERTOP = period_ticks;
+    PWM.COUNTERTOP = period_ticks >> prescaler;
 
     // Update our internal record to reflect an accurate (probably rounded) samplerate.
-    sampleRate = (clock_frequency / (prescaler+1)) / period_ticks;
+    period_ticks = period_ticks >> prescaler;
+    period_ticks = period_ticks << prescaler;
+
+    periodUs = period_ticks / (clock_frequency/1000000);
+    sampleRate = 1000000 / periodUs;
 
     return DEVICE_OK;
 }
+
+/**
+ * Determine the current DAC playback period.
+ * @return period The sample playback period, in microseconds.
+ */
+int NRF52PWM::getPeriodUs()
+{
+    return periodUs;
+}
+
 
 /** 
  * Defines the mode in which the PWM module will operate, in terms of how it interprets data provided from the DataSource:
@@ -234,7 +248,7 @@ int NRF52PWM::pull()
         active = false;
         return DEVICE_OK;
     }
-    
+
     prefill(); // pre-fetch next buffer
 
     return DEVICE_OK;
