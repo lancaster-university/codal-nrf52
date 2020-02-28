@@ -105,8 +105,13 @@ void set_alloc_peri_irq(void *device, PUserCallback fn, void *userdata)
 DEF_IRQ(SPIM0_SPIS0_TWIM0_TWIS0_SPI0_TWI0_IRQHandler, 0)
 DEF_IRQ(SPIM1_SPIS1_TWIM1_TWIS1_SPI1_TWI1_IRQHandler, 1)
 DEF_IRQ(SPIM2_SPIS2_SPI2_IRQHandler, 2)
+DEF_IRQ(UARTE0_UART0_IRQHandler, 3)
 #if defined(NRF_SPIM3)
 DEF_IRQ(SPIM3_IRQHandler, 4)
 #endif
+#if defined(NRF_UARTE1)
+DEF_IRQ(UARTE1_IRQHandler, 5)
+#endif
+
 
 } // namespace codal
