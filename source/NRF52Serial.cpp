@@ -15,11 +15,52 @@ extern int8_t target_get_irq_disabled();
  *
  **/
 NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
- : Serial(tx, rx), is_configured_(false), is_tx_in_progress_(false)
+ : Serial(tx, rx), is_tx_in_progress_(false), p_uarte_(NULL)
 {
     if(device != NULL)
         p_uarte_ = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
-    configurePins(tx,rx);
+    else
+        p_uarte_ = (NRF_UARTE_Type*)allocate_peripheral(PERI_MODE_UARTE);                    
+
+    if(p_uarte_ == NULL)
+        target_panic(DEVICE_HARDWARE_CONFIGURATION_ERROR);
+
+    nrf_uarte_config_t hal_config;
+    hal_config.hwfc = NRF_UARTE_HWFC_DISABLED;
+    hal_config.parity = NRF_UARTE_PARITY_EXCLUDED;
+#if defined(UARTE_CONFIG_STOP_Msk)    
+    hal_config.stop = NRF_UARTE_STOP_ONE;
+#endif    
+#if defined(UARTE_CONFIG_PARITYTYPE_Msk)
+    hal_config.paritytype = NRF_UARTE_PARITYTYPE_EVEN;
+#endif
+
+    nrf_uarte_baudrate_set(p_uarte_, NRF_UARTE_BAUDRATE_115200);
+    nrf_uarte_configure(p_uarte_, &hal_config);
+    configurePins(tx, rx);
+
+    nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXDRDY);
+    nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDRX);
+    nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDTX);
+    nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ERROR);
+    nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXTO);
+    nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
+    nrf_uarte_int_enable(p_uarte_,  NRF_UARTE_INT_RXDRDY_MASK|
+                                    NRF_UARTE_INT_ENDRX_MASK |
+                                    NRF_UARTE_INT_ENDTX_MASK |
+                                    NRF_UARTE_INT_ERROR_MASK |
+                                    NRF_UARTE_INT_RXTO_MASK  |
+                                    NRF_UARTE_INT_TXSTOPPED_MASK);
+
+    set_alloc_peri_irq(p_uarte_, &_irqHandler, this);
+
+    IRQn_Type IRQn = get_alloc_peri_irqn(p_uarte_);
+
+    NVIC_SetPriority(IRQn, 1);
+    NVIC_ClearPendingIRQ(IRQn);
+    NVIC_EnableIRQ(IRQn);            
+
+    nrf_uarte_enable(p_uarte_);
 }
 
 NRF52Serial::~NRF52Serial()
@@ -43,6 +84,8 @@ NRF52Serial::~NRF52Serial()
 
     nrf_uarte_disable(p_uarte_);
     nrf_uarte_txrx_pins_disconnect(p_uarte_);
+
+    free_alloc_peri(p_uarte_);
 }
 
 void NRF52Serial::_irqHandler(void *self_)
@@ -99,9 +142,6 @@ void NRF52Serial::_irqHandler(void *self_)
 
 int NRF52Serial::enableInterrupt(SerialInterruptType t)
 {
-    if(is_configured_ == false)
-        return DEVICE_INVALID_STATE;
-
     if (t == RxInterrupt){
         if(!(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT))
             initialiseRx();
@@ -131,9 +171,6 @@ int NRF52Serial::enableInterrupt(SerialInterruptType t)
 
 int NRF52Serial::disableInterrupt(SerialInterruptType t)
 {
-    if(is_configured_ == false)
-        return DEVICE_INVALID_STATE;
-
     if (t == RxInterrupt){
         nrf_uarte_int_disable(p_uarte_, NRF_UARTE_INT_ERROR_MASK |
                                         NRF_UARTE_INT_ENDRX_MASK);
@@ -150,9 +187,6 @@ int NRF52Serial::disableInterrupt(SerialInterruptType t)
 
 int NRF52Serial::setBaudrate(uint32_t baudrate)
 {
-    if(is_configured_ == false)
-        return DEVICE_INVALID_STATE;
-
     nrf_uarte_baudrate_t baud = NRF_UARTE_BAUDRATE_115200;
 
     switch(baudrate)
@@ -172,71 +206,15 @@ int NRF52Serial::setBaudrate(uint32_t baudrate)
 
 int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 {
-    int ret;
-
     this->tx = tx;
     this->rx = rx;
-
-    if(p_uarte_ == NULL){
-        p_uarte_ = (NRF_UARTE_Type*)allocate_peripheral(PERI_MODE_UARTE);
-    }
-
-    if(p_uarte_ != NULL){
-        if(is_configured_ == true){
-            nrf_uarte_txrx_pins_set(p_uarte_, tx.name, rx.name);
-        }else{
-            nrf_uarte_config_t hal_config;
-            hal_config.hwfc = NRF_UARTE_HWFC_DISABLED;
-            hal_config.parity = NRF_UARTE_PARITY_EXCLUDED;
-        #if defined(UARTE_CONFIG_STOP_Msk)    
-            hal_config.stop = NRF_UARTE_STOP_ONE;
-        #endif    
-        #if defined(UARTE_CONFIG_PARITYTYPE_Msk)
-            hal_config.paritytype = NRF_UARTE_PARITYTYPE_EVEN;
-        #endif
-
-            nrf_uarte_baudrate_set(p_uarte_, NRF_UARTE_BAUDRATE_115200);
-            nrf_uarte_configure(p_uarte_, &hal_config);
-            nrf_uarte_txrx_pins_set(p_uarte_, tx.name, rx.name);
-
-            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXDRDY);
-            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDRX);
-            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDTX);
-            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ERROR);
-            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXTO);
-            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
-            nrf_uarte_int_enable(p_uarte_,  NRF_UARTE_INT_RXDRDY_MASK|
-                                            NRF_UARTE_INT_ENDRX_MASK |
-                                            NRF_UARTE_INT_ENDTX_MASK |
-                                            NRF_UARTE_INT_ERROR_MASK |
-                                            NRF_UARTE_INT_RXTO_MASK  |
-                                            NRF_UARTE_INT_TXSTOPPED_MASK);
-
-            set_alloc_peri_irq(p_uarte_, &_irqHandler, this);
-
-            IRQn_Type IRQn = get_alloc_peri_irqn(p_uarte_);
-
-            NVIC_SetPriority(IRQn, 1);
-            NVIC_ClearPendingIRQ(IRQn);
-            NVIC_EnableIRQ(IRQn);            
-
-            nrf_uarte_enable(p_uarte_);
-
-            is_configured_ = true;
-        }
-        ret = DEVICE_OK;
-    }else{
-        ret = DEVICE_NO_RESOURCES;
-    }
-    
-    return ret;
+    nrf_uarte_txrx_pins_set(p_uarte_, tx.name, rx.name);
+      
+    return DEVICE_OK;
 }
 
 int NRF52Serial::putc(char c)
 {
-    if(is_configured_ == false)
-        return DEVICE_INVALID_STATE;
-
     int res = DEVICE_OK;
 
     while(!target_get_irq_disabled() && is_tx_in_progress_);
@@ -276,15 +254,7 @@ int NRF52Serial::putc(char c)
 
 int NRF52Serial::getc()
 {
-    if(is_configured_ == false)
-        return DEVICE_INVALID_STATE;
-
     return this->getChar(codal::SerialMode::ASYNC);
-}
-
-bool NRF52Serial::isConfigured() const
-{
-    return is_configured_;
 }
 
 void NRF52Serial::dataReceivedDMA()
@@ -331,9 +301,6 @@ void NRF52Serial::dataReceivedDMA()
 
 void NRF52Serial::updateRxBufferAfterENDRX()
 {
-    if(is_configured_ == false)
-        return;
-
     static uint8_t rx_dummy_byte_;
 
     int rx_buffered_size = rxBufferedSize();

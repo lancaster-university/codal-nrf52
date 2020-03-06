@@ -12,7 +12,6 @@ namespace codal
 {
     class NRF52Serial : public Serial
     {
-        bool is_configured_;
         bool is_tx_in_progress_;
 
         NRF_UARTE_Type *p_uarte_;
@@ -58,17 +57,6 @@ namespace codal
 
         virtual int putc(char) override;
         virtual int getc() override;
-
-        /**
-          * Checks if the serial driver(UARTE) is configured correctly.
-          *
-          * Other member functions can throw exceptions through this function (such as NULL pointer access).
-          * 
-          * @return configuration state of serial driver(UARTE),
-          *         If it is configured correctly, it returns true(1), 
-          *         otherwise it returns false(0).
-         **/
-        bool isConfigured() const;
 
         ~NRF52Serial();
     };
