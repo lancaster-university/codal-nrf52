@@ -29,9 +29,10 @@ void target_enable_irq()
 
 void target_disable_irq()
 {
+    // always disable just in case - it's just one instruction
+    __disable_irq();
     irq_disabled++;
-    if (irq_disabled == 1)
-        __disable_irq();
+    // this used to disable here, only if irq_disabled==1 - this was a race
 }
 
 void target_wait_for_event()

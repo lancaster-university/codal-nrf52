@@ -156,7 +156,7 @@ int NRFLowLevelTimer::setCompare(uint8_t channel, uint32_t value)
         return DEVICE_INVALID_PARAMETER;
 
     timer->CC[channel] = value;
-    timer->INTENSET |= (1 << channel) << TIMER_INTENSET_COMPARE0_Pos;
+    timer->INTENSET = (1 << channel) << TIMER_INTENSET_COMPARE0_Pos;
 
     return DEVICE_OK;
 }
@@ -167,7 +167,7 @@ int NRFLowLevelTimer::offsetCompare(uint8_t channel, uint32_t value)
         return DEVICE_INVALID_PARAMETER;
 
     timer->CC[channel] += value;
-    timer->INTENSET |= (1 << channel) << TIMER_INTENSET_COMPARE0_Pos;
+    timer->INTENSET = (1 << channel) << TIMER_INTENSET_COMPARE0_Pos;
 
     return DEVICE_OK;
 }
@@ -177,7 +177,7 @@ int NRFLowLevelTimer::clearCompare(uint8_t channel)
     if (channel > getChannelCount() - 1)
         return DEVICE_INVALID_PARAMETER;
 
-    timer->INTENCLR |= (1 << channel) << TIMER_INTENCLR_COMPARE0_Pos;
+    timer->INTENCLR = (1 << channel) << TIMER_INTENCLR_COMPARE0_Pos;
     return DEVICE_OK;
 }
 

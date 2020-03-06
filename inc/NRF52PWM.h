@@ -23,6 +23,7 @@ private:
     bool            active;
     int             dataReady;
     int             sampleRate;
+    int             periodUs;
 
     void prefill();
 
@@ -33,7 +34,8 @@ public:
     ManagedBuffer buffer, nextBuffer;
 
     /**
-      * Constructor for an instance of a DAC.
+      * Constructor for an instance of a PWM acting as a sink to a given (likely DMA enabled) datastream.
+      * Use this constructor to create a PWM output who's values are controlled dynamically by an asynchronous data stream.
       *
       * @param source The DataSource that will provide data.
       * @param sampleRate The frequency (in Hz) that data will be presented.
@@ -68,6 +70,42 @@ public:
      * @param frequency The new sample playback frequency.
      */
     int setSampleRate(int frequency);
+
+    /**
+     * Determine the current DAC playback period.
+     * @return period The sample playback period, in microseconds.
+     */
+    int getPeriodUs();
+
+
+    /**
+     * Change the DAC playback sample rate to the given period.
+     * @param period The new sample playback period, in microseconds.
+     */
+    int setPeriodUs(int period);
+
+    /** 
+     * Defines the mode in which the PWM module will operate, in terms of how it interprets data provided from the DataSource:
+     * Valid options are:
+     * 
+     * PWM_DECODER_LOAD_Common          1st half word (16-bit) used in all PWM channels 0..3 
+     * PWM_DECODER_LOAD_Grouped         1st half word (16-bit) used in channel 0..1; 2nd word in channel 2..3
+     * PWM_DECODER_LOAD_Individual      1st half word (16-bit) in ch.0; 2nd in ch.1; ...; 4th in ch.3 
+     * PWM_DECODER_LOAD_WaveForm        1st half word (16-bit) in ch.0; 2nd in ch.1; ...; 4th in COUNTERTOP
+     * 
+     * (See nrf52 product specificaiton for more details)
+     * 
+     * @param mode The mode for this PWM module to use.
+     * @return DEVICE_OK, or DEVICE_INVALID_PARAMETER.
+     */
+    int setDecoderMode(uint32_t mode);
+ 
+    /**
+     * Defines if the PWM modules should repeat the previous sample when the end of the stream is reached.
+     * 
+     * @ param repeat if true, the last PWM sample received is repeated if the stream underflows. If false, the PWM module will stop processing on stream underflow.
+     */
+    void setLoop(bool repeat);
 
     /**
      * Interrupt callback when playback of DMA buffer has completed

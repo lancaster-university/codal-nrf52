@@ -29,9 +29,13 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalConfig.h"
 #include "CodalComponent.h"
 #include "Event.h"
+#include "NRF52PWM.h"
+#include "MemorySource.h"
 
 #define ID_NRF52_PIN_HI  (DEVICE_ID_IO_P0 + 35)
 #define ID_NRF52_PIN_LO  (DEVICE_ID_IO_P0 + 36)
+
+#define NRF52PIN_PWM_CHANNEL_MAP_SIZE        4
 
 /**
   * Class definition for Pin.
@@ -47,13 +51,19 @@ namespace codal
 
     class NRF52Pin : public codal::Pin
     {
+        static MemorySource* pwmSource;
+        static NRF52PWM* pwm;
+        static uint16_t pwmBuffer[NRF52PIN_PWM_CHANNEL_MAP_SIZE];
+        static int8_t pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE];
+        static uint8_t lastUsedChannel;
+
         void* obj;
 
+
         /**
-             * Performs a check to ensure that the current Pin is in control of a
-             * DynamicPwm instance, and if it's not, allocates a new DynamicPwm instance.
+             * Instantiates the components required for PWM if not previously created
              */
-        int obtainAnalogChannel();
+        int initialisePWM();
 
         /**
              * This member function manages the calculation of the timestamp of a pulse detected
@@ -351,6 +361,16 @@ namespace codal
          * @return true if HIGH DRIVE is enabled on this pin, false otherwise
          */
         bool isHighDrive();
+
+        /**
+         * Set pin value iff its current value as input is the opposite.
+         * 
+         * If pin is configured as input and reads as !value, set it to value
+         * and return DEVICE_OK.
+         * Otherwise, do nothing and return DEVICE_BUSY.
+         * Note, that this is overwritten in hardware-specific classes to check the condition immedietly before changing the pin value.
+         */
+        virtual int getAndSetDigitalValue(int value);
     };
 }
 
