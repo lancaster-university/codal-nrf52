@@ -70,6 +70,20 @@ void *allocate_peripheral(PeripheralMode mode)
     return NULL;
 }
 
+void free_alloc_peri(void* device)
+{
+    int i = MAX_NUM_ALLOCATABLE_PERI - 1;
+    while (i >= 0)
+    {
+        if (peris[i].device == device)
+        {
+            used_peris &= ~(1 << i);
+            break;
+        }
+        i--;
+    }
+}
+
 static int get_alloc_peri_idx(void *device)
 {
     for (int i = 0; i < MAX_NUM_ALLOCATABLE_PERI; ++i)

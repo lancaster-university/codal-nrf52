@@ -20,6 +20,7 @@ enum PeripheralMode : uint32_t
 
 void *allocate_peripheral(PeripheralMode mode);
 void *allocate_peripheral(void *device);
+void free_alloc_peri(void* device);
 IRQn_Type get_alloc_peri_irqn(void *device);
 void set_alloc_peri_irq(void *device, PUserCallback fn, void *userdata);
 
