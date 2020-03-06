@@ -4,14 +4,22 @@
 #include "CodalCompat.h"
 #include "Timer.h"
 
+static int8_t irq_disabled;
 void target_enable_irq()
 {
-    __enable_irq();
+    irq_disabled--;
+    if (irq_disabled <= 0) {
+        irq_disabled = 0;
+        __enable_irq();
+    }
 }
 
 void target_disable_irq()
 {
+    // always disable just in case - it's just one instruction
     __disable_irq();
+    irq_disabled++;
+    // this used to disable here, only if irq_disabled==1 - this was a race
 }
 
 void target_wait_for_event()

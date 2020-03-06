@@ -68,7 +68,7 @@ void GPIOTE_IRQHandler(void)
     if (NRF_GPIOTE->EVENTS_PORT && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
     {
         NRF_GPIOTE->EVENTS_PORT = 0;
-        for (uint8_t i = 0; i < 31; i++)
+        for (uint8_t i = 0; i <= 31; i++)
         {
             if (interrupt_enable & (1 << i) && irq_pins[i] && NRF_P0->LATCH & (1 << i))
             {
@@ -182,6 +182,13 @@ int NRF52Pin::setDigitalValue(int value)
     if(!(PIN_CAPABILITY_DIGITAL & capability))
         return DEVICE_NOT_SUPPORTED;
 
+    // Write the value, before setting as output - this way the pin state update will be atomic    
+    if (value)
+        PORT->OUTSET = 1 << PIN;
+    else
+        PORT->OUTCLR = 1 << PIN;
+
+
     // Move into a Digital output state if necessary.
     if (!(status & IO_STATUS_DIGITAL_OUT))
     {
@@ -201,12 +208,6 @@ int NRF52Pin::setDigitalValue(int value)
         // Record our mode, so we can optimise later.
         status |= IO_STATUS_DIGITAL_OUT;
     }
-
-    // Write the value.
-    if (value)
-        PORT->OUTSET = 1 << PIN;
-    else
-        PORT->OUTCLR = 1 << PIN;
 
     return DEVICE_OK;
 }
@@ -416,7 +417,7 @@ int NRF52Pin::isInput()
   */
 int NRF52Pin::isOutput()
 {
-    return (status & (IO_STATUS_DIGITAL_OUT | IO_STATUS_ANALOG_OUT)) == 0 ? 0 : 1;
+    return (PORT->DIR & (1 << PIN)) != 0 || (status & (IO_STATUS_DIGITAL_OUT | IO_STATUS_ANALOG_OUT)) != 0;
 }
 
 /**
@@ -725,6 +726,7 @@ int NRF52Pin::eventOn(int eventType)
 {
     switch(eventType)
     {
+        case DEVICE_PIN_INTERRUPT_ON_EDGE:
         case DEVICE_PIN_EVENT_ON_EDGE:
         case DEVICE_PIN_EVENT_ON_PULSE:
             enableRiseFallEvents(eventType);
@@ -774,4 +776,47 @@ bool NRF52Pin::isHighDrive()
     uint32_t s = PORT->PIN_CNF[PIN] & 0x00000700;
 
     return (s == 0x00000300);
+}
+
+__attribute__((noinline))
+static void get_and_set(NRF_GPIO_Type *port, uint32_t mask) {
+    // 0 -> 1, only set when IN==0
+    port->DIRSET = ~port->IN & mask;
+}
+
+__attribute__((noinline))
+static void get_and_clr(NRF_GPIO_Type *port, uint32_t mask) {
+    // 1 -> 0, only set when IN==1
+    port->DIRSET = port->IN & mask;
+}
+
+int NRF52Pin::getAndSetDigitalValue(int value)
+{
+    uint32_t mask = 1 << PIN;
+
+    if ((PORT->DIR & mask) == 0)
+    {
+        // set the value
+        if (value)
+            PORT->OUTSET = mask;
+        else
+            PORT->OUTCLR = mask;
+
+        // pin in input mode, do the "atomic" set
+        if (value)
+            get_and_set(PORT, mask);
+        else
+            get_and_clr(PORT, mask);
+
+        if (PORT->DIR & mask) {
+            disconnect();
+            setDigitalValue(value); // make sure 'status' is updated
+            return 0;
+        } else {
+
+            return DEVICE_BUSY;
+        }
+    }
+
+    return 0;
 }
