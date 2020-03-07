@@ -5,6 +5,19 @@
 #include "Timer.h"
 
 static int8_t irq_disabled;
+
+// codal::Serial is designed by Polling or Interrupt method without considering DMA.
+// In particular, printf forcibly disables interrupts using target_disable_irq(),
+// which does not match the behavior of UARTE using Event Interrupt.
+// For this reason, when used with the Serial::send() function,
+// there are several problems. We can solve this problem a bit
+// by checking the irq disabled state in the code. (not all exceptions have been handled yet)
+// Therefore, this function is necessary. (This function is used in nRF52Serial extern way)
+int8_t target_get_irq_disabled()
+{
+    return irq_disabled;
+}
+
 void target_enable_irq()
 {
     irq_disabled--;

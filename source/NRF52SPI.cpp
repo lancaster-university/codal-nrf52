@@ -28,10 +28,10 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalDmesg.h"
 #include "codal-core/inc/types/Event.h"
 #include "CodalFiber.h"
-#include "sync_serial.h"
+#include "peripheral_alloc.h"
 
-#ifdef NRF_SPIM3
-#define SZLIMIT (p_spim == NRF_SPIM3 ? 0xffff : 0xff)
+#if defined(NRF52840_XXAA) || defined(NRF52833_XXAA)
+#define SZLIMIT 0xffff
 #else
 #define SZLIMIT 0xff
 #endif
@@ -42,18 +42,22 @@ namespace codal
 /**
  * Constructor.
  */
-NRF52SPI::NRF52SPI(Pin &mosi, Pin &miso, Pin &sclk)
+NRF52SPI::NRF52SPI(Pin &mosi, Pin &miso, Pin &sclk, NRF_SPIM_Type* device)
     : codal::SPI(), mosi(mosi), miso(miso), sck(sclk)
 {
-    p_spim = (NRF_SPIM_Type *)allocate_sync_serial(SYNC_SERIAL_MODE_SPIM);
+    if(device == NULL)
+        p_spim = (NRF_SPIM_Type *)allocate_peripheral(PERI_MODE_SPIM);
+    else
+        p_spim = (NRF_SPIM_Type *)allocate_peripheral((void *)device);
+
     if (!p_spim)
         target_panic(DEVICE_HARDWARE_CONFIGURATION_ERROR);
-    IRQn = sync_serial_irqn(p_spim);
+    IRQn = get_alloc_peri_irqn(p_spim);
     configured = 0;
     setFrequency(1000000);
     setMode(0);
     doneHandler = NULL;
-    set_sync_serial_irq(p_spim, &_irqDoneHandler, this);
+    set_alloc_peri_irq(p_spim, &_irqDoneHandler, this);
 }
 
 void NRF52SPI::_irqDoneHandler(void *self_)
