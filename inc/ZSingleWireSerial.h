@@ -7,6 +7,7 @@
 #include "SingleWireSerial.h"
 #include "JACDAC.h"
 #include "MemberFunctionCallback.h"
+#include "nrf.h"
 
 #define SINGLE_WIRE_SERIAL_EVT_RX_FULL      1
 #define SINGLE_WIRE_SERIAL_EVT_TX_EMPTY     2020        // using shared notify id, hopefully no one else uses this...
@@ -16,21 +17,17 @@ namespace codal
 
     class ZSingleWireSerial : public DMASingleWireSerial
     {
-        uint8_t* buf;
-        uint16_t bufLen;
-
         protected:
         virtual int configureTx(int);
         virtual int configureRx(int);
+        static void irq_handler(void *);
+        void irq_handler();
+        NRF_UARTE_Type *uart;
 
         public:
 
-        uint16_t bytes_received;
-
         virtual void configureRxInterrupt(int enable);
         virtual void configureTxInterrupt(int enable);
-
-        static ZSingleWireSerial* instance;
 
         ZSingleWireSerial(Pin& p);
 
