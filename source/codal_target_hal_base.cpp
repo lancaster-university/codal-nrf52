@@ -76,6 +76,11 @@ __attribute__((used, aligned(512))) static VtorCopy vtorCopy;
 extern "C" void target_start()
 {
     NRF_NVMC->ICACHECNF = NVMC_ICACHECNF_CACHEEN_Enabled;
+    // bring ports back to reset state, in case bootloader messed it up
+    for (int i = 0; i < 32; ++i) {
+        NRF_P0->PIN_CNF[i] = 2;
+        NRF_P1->PIN_CNF[i] = 2;
+    }
     user_init();
     _start();
 }
