@@ -65,7 +65,7 @@ extern "C" {
 #endif
 void GPIOTE_IRQHandler(void)
 {
-    if (NRF_GPIOTE->EVENTS_PORT && ((NRF_GPIOTE->INTENSET & GPIOTE_INTENSET_PORT_Msk) != 0))
+    if (NRF_GPIOTE->EVENTS_PORT)
     {
         NRF_GPIOTE->EVENTS_PORT = 0;
         for (uint8_t i = 0; i <= 31; i++)
@@ -80,19 +80,19 @@ void GPIOTE_IRQHandler(void)
                 {
                     // swap!
                     NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
-                    // need to clear latch after swap
-                    NRF_P0->LATCH |= (1 << i);
                     irq_pins[i]->rise();
                 }
                 else
                 {
                     // swap!
                     NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
-                    NRF_P0->LATCH |= (1 << i);
                     irq_pins[i]->fall();
                 }
             }
         }
+        // make sure to clear everything
+        NRF_P0->LATCH = 0xffffffff;
+        NRF_P1->LATCH = 0xffffffff;
     }
 }
 
@@ -651,16 +651,22 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     // if we are in neither of the two modes, configure pin as a TimedInterruptIn.
     if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
     {
-        getDigitalValue(pullMode);
+        int v = getDigitalValue(pullMode);
 
         if (!this->obj)
             this->obj = new PinTimeStruct;
 
         ((PinTimeStruct*)obj)->last_time = 0;
 
+        // PORT->DETECTMODE = 1; // latched-detect
+
         PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
-        PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
-        PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+        if (v)
+            PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+        else
+            PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
+
+        PORT->LATCH = 1 << PIN; // clear any pending latch
 
         // configure as interrupt in
         interrupt_enable |= (1 << this->name);
