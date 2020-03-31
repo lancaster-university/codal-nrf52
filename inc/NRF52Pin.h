@@ -36,6 +36,7 @@ DEALINGS IN THE SOFTWARE.
 #define ID_NRF52_PIN_LO  (DEVICE_ID_IO_P0 + 36)
 
 #define NRF52PIN_PWM_CHANNEL_MAP_SIZE        4
+#define NRF52PIN_SSADC_MHANNEL_MAP_SIZE      8
 
 /**
   * Class definition for Pin.
@@ -58,13 +59,19 @@ namespace codal
         static uint8_t lastUsedChannel;
 
         void* obj;
-
-
+        
+        static int8_t saadcChannelMap[NRF52PIN_SSADC_MHANNEL_MAP_SIZE];
+        static int16_t adcSample;
+        
         /**
              * Instantiates the components required for PWM if not previously created
              */
         int initialisePWM();
 
+        /**
+             * Instantiates the components required for PWM if not previously created
+             */
+        int initialiseSAADC();
         /**
              * This member function manages the calculation of the timestamp of a pulse detected
              * on a pin whilst in IO_STATUS_EVENT_PULSE_ON_EDGE or IO_STATUS_EVENT_ON_EDGE modes.
