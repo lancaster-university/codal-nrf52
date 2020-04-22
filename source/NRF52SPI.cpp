@@ -24,6 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 #include "CodalConfig.h"
 #include "NRF52SPI.h"
+#include "NRF52Pin.h"
 #include "ErrorNo.h"
 #include "CodalDmesg.h"
 #include "codal-core/inc/types/Event.h"
@@ -42,10 +43,10 @@ namespace codal
 /**
  * Constructor.
  */
-NRF52SPI::NRF52SPI(Pin &mosi, Pin &miso, Pin &sclk, NRF_SPIM_Type* device)
+NRF52SPI::NRF52SPI(Pin &mosi, Pin &miso, Pin &sclk, NRF_SPIM_Type *device)
     : codal::SPI(), mosi(mosi), miso(miso), sck(sclk)
 {
-    if(device == NULL)
+    if (device == NULL)
         p_spim = (NRF_SPIM_Type *)allocate_peripheral(PERI_MODE_SPIM);
     else
         p_spim = (NRF_SPIM_Type *)allocate_peripheral((void *)device);
@@ -134,6 +135,14 @@ int NRF52SPI::startTransfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *r
         return codal::SPI::startTransfer(txBuffer, txSize, rxBuffer, rxSize, doneHandler, arg);
 }
 
+static void setDrive(Pin *p)
+{
+    if (!p)
+        return;
+    NRF52Pin *pp = (NRF52Pin *)p;
+    pp->setHighDrive(true);
+}
+
 void NRF52SPI::config()
 {
     if (configured)
@@ -141,11 +150,8 @@ void NRF52SPI::config()
     configured = 1;
 
     sck.setDigitalValue(mode <= 1 ? 0 : 1);
-    NRF_GPIO->PIN_CNF[sck.name] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos) |
-                                  (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos) |
-                                  (GPIO_PIN_CNF_PULL_Disabled << GPIO_PIN_CNF_PULL_Pos) |
-                                  (GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos) |
-                                  (GPIO_PIN_CNF_SENSE_Disabled << GPIO_PIN_CNF_SENSE_Pos);
+    setDrive(&sck);
+    setDrive(&mosi);
     uint32_t mosi_pin = 0xffffffff;
     uint32_t miso_pin = 0xffffffff;
     if (&mosi)
