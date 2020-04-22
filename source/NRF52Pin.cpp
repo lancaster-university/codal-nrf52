@@ -295,7 +295,7 @@ int NRF52Pin::initialiseSAADC()
 
         // Enable SAADC (would capture analog pins if they were used in CH[0].PSELP)
         NRF_SAADC->ENABLE = SAADC_ENABLE_ENABLE_Enabled << SAADC_ENABLE_ENABLE_Pos;
-        
+       
         // Calibrate the SAADC (only needs to be done once in a while)
         NRF_SAADC->TASKS_CALIBRATEOFFSET = 1;
         while (NRF_SAADC->EVENTS_CALIBRATEDONE == 0);
@@ -434,6 +434,14 @@ int NRF52Pin::getAnalogValue()
     {
         initialiseSAADC();
     }
+    
+    // Configure SAADC singled-ended channel, Internal reference (0.6V) and 1/6 gain.
+    NRF_SAADC->CH[0].CONFIG = (SAADC_CH_CONFIG_GAIN_Gain1_4    << SAADC_CH_CONFIG_GAIN_Pos) |
+                              (SAADC_CH_CONFIG_MODE_SE         << SAADC_CH_CONFIG_MODE_Pos) |
+                              (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
+                              (SAADC_CH_CONFIG_RESN_Bypass     << SAADC_CH_CONFIG_RESN_Pos) |
+                              (SAADC_CH_CONFIG_RESP_Bypass     << SAADC_CH_CONFIG_RESP_Pos) |
+                              (SAADC_CH_CONFIG_TACQ_40us        << SAADC_CH_CONFIG_TACQ_Pos);
 
     // Configure the SAADC channel with VDD as positive input, no negative input(single ended).
     NRF_SAADC->CH[0].PSELP = ((unsigned long)channel) << SAADC_CH_PSELP_PSELP_Pos;
@@ -449,7 +457,8 @@ int NRF52Pin::getAnalogValue()
     while (NRF_SAADC->EVENTS_END == 0);
     NRF_SAADC->EVENTS_END = 0;
 
-    return adcSample;
+    if(adcSample < 0) return 0;
+    else return adcSample;
 }
 
 /**
