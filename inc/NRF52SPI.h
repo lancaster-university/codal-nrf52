@@ -74,6 +74,8 @@ public:
      */
     virtual int setFrequency(uint32_t frequency);
 
+    int frequency(uint32_t frequency) { return setFrequency(frequency); }
+
     /** Set the mode of the SPI interface
      *
      * @param mode Clock polarity and phase mode (0 - 3)
@@ -89,6 +91,8 @@ public:
      * @endcode
      */
     virtual int setMode(int mode, int bits = 8);
+
+    int format(int bits, int mode) { return setMode(mode, bits); }
 
     /**
      * Writes the given byte to the SPI bus.
