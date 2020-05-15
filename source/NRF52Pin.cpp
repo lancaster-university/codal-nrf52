@@ -60,7 +60,7 @@ int8_t NRF52Pin::pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {-1,-1,-1,-1};
 uint8_t NRF52Pin::lastUsedChannel = 3;
 
 int16_t NRF52Pin::adcSample = 0;
-int8_t NRF52Pin::saadcChannelMap[NRF52PIN_SSADC_MHANNEL_MAP_SIZE] = {2,3,4,5,28,29,30,31};
+int8_t NRF52Pin::saadcChannelMap[NRF52PIN_SAADC_CHANNEL_MAP_SIZE] = {2,3,4,5,28,29,30,31};
  
 #ifdef __cplusplus
 extern "C" {
@@ -435,13 +435,14 @@ int NRF52Pin::getAnalogValue()
         initialiseSAADC();
     }
     
-    // Configure SAADC singled-ended channel, Internal reference (0.6V) and 1/6 gain.
+    // Configure SAADC singled-ended channel, Internal reference (VDD/4) and 1/4 gain.
+    // Can use +- 3.3V
     NRF_SAADC->CH[0].CONFIG = (SAADC_CH_CONFIG_GAIN_Gain1_4    << SAADC_CH_CONFIG_GAIN_Pos) |
                               (SAADC_CH_CONFIG_MODE_SE         << SAADC_CH_CONFIG_MODE_Pos) |
                               (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
                               (SAADC_CH_CONFIG_RESN_Bypass     << SAADC_CH_CONFIG_RESN_Pos) |
                               (SAADC_CH_CONFIG_RESP_Bypass     << SAADC_CH_CONFIG_RESP_Pos) |
-                              (SAADC_CH_CONFIG_TACQ_40us        << SAADC_CH_CONFIG_TACQ_Pos);
+                              (SAADC_CH_CONFIG_TACQ_10us        << SAADC_CH_CONFIG_TACQ_Pos);
 
     // Configure the SAADC channel with VDD as positive input, no negative input(single ended).
     NRF_SAADC->CH[0].PSELP = ((unsigned long)channel) << SAADC_CH_PSELP_PSELP_Pos;

@@ -36,7 +36,7 @@ DEALINGS IN THE SOFTWARE.
 #define ID_NRF52_PIN_LO  (DEVICE_ID_IO_P0 + 36)
 
 #define NRF52PIN_PWM_CHANNEL_MAP_SIZE        4
-#define NRF52PIN_SSADC_MHANNEL_MAP_SIZE      8
+#define NRF52PIN_SAADC_CHANNEL_MAP_SIZE      8
 
 /**
   * Class definition for Pin.
