@@ -15,7 +15,8 @@ enum PeripheralMode : uint32_t
     PERI_MODE_I2CS  = 0x00000002,
     PERI_MODE_SPIM  = 0x00000004,
     PERI_MODE_SPIS  = 0x00000008,
-    PERI_MODE_UARTE = 0x00000010
+    PERI_MODE_UARTE = 0x00000010,
+    PERI_MODE_I2S   = 0x00000020
 };
 
 void *allocate_peripheral(PeripheralMode mode);

@@ -59,7 +59,9 @@ uint16_t NRF52Pin::pwmBuffer[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {0,0,0,0};
 int8_t NRF52Pin::pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {-1,-1,-1,-1};
 uint8_t NRF52Pin::lastUsedChannel = 3;
 
-
+int16_t NRF52Pin::adcSample = 0;
+int8_t NRF52Pin::saadcChannelMap[NRF52PIN_SAADC_CHANNEL_MAP_SIZE] = {2,3,4,5,28,29,30,31};
+ 
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -277,6 +279,36 @@ int NRF52Pin::initialisePWM()
     return DEVICE_OK;
 }
 
+int NRF52Pin::initialiseSAADC()
+{
+    static bool isConfig = false;
+
+    if(!isConfig)
+    {
+        isConfig = true;
+        
+        // Configure the SAADC resolution.
+        NRF_SAADC->RESOLUTION = SAADC_RESOLUTION_VAL_12bit << SAADC_RESOLUTION_VAL_Pos;
+
+        // No automatic sampling, will trigger with TASKS_SAMPLE.
+        NRF_SAADC->SAMPLERATE = SAADC_SAMPLERATE_MODE_Task << SAADC_SAMPLERATE_MODE_Pos;
+
+        // Enable SAADC (would capture analog pins if they were used in CH[0].PSELP)
+        NRF_SAADC->ENABLE = SAADC_ENABLE_ENABLE_Enabled << SAADC_ENABLE_ENABLE_Pos;
+       
+        // Calibrate the SAADC (only needs to be done once in a while)
+        NRF_SAADC->TASKS_CALIBRATEOFFSET = 1;
+        while (NRF_SAADC->EVENTS_CALIBRATEDONE == 0);
+        NRF_SAADC->EVENTS_CALIBRATEDONE = 0;
+        while (NRF_SAADC->STATUS == (SAADC_STATUS_STATUS_Busy <<SAADC_STATUS_STATUS_Pos));
+    }
+    // Configure result to be put in RAM at the location of "result" variable.
+    NRF_SAADC->RESULT.MAXCNT = 1;
+    NRF_SAADC->RESULT.PTR = (uint32_t)&adcSample;
+
+    return DEVICE_OK;
+}
+
 /**
   * Configures this IO pin as an analog/pwm output, and change the output value to the given level.
   *
@@ -379,25 +411,55 @@ int NRF52Pin::setServoValue(int value, int range, int center)
   */
 int NRF52Pin::getAnalogValue()
 {
+    int channel = -1;
 
-    // //check if this pin has an analogue mode...
-    // if(!(PIN_CAPABILITY_ANALOG & capability))
-    //     return DEVICE_NOT_SUPPORTED;
+    // check if this pin has an analogue mode...
+    if(!(PIN_CAPABILITY_ANALOG & capability))
+        return DEVICE_NOT_SUPPORTED;
+    
+    // find existiong channel
+    for(int i = 0; i < NRF52PIN_SSADC_MHANNEL_MAP_SIZE; i++)
+    {
+        if(saadcChannelMap[i] == name)
+        {
+            channel = i+1; 
+            break;
+        }
+            
+    }
 
-    // // Move into an analogue input state if necessary.
-    // if (!(status & IO_STATUS_ANALOG_IN)){
-    //     disconnect();
-    //     NRF->ADC
-    //     // Enable input mode, and input buffer
-    //     NRF_P0->PIN_CNF[name] &= 0xfffffffc;
+    // no existing channel found
+    if (channel == -1) return DEVICE_NOT_SUPPORTED;
+    else
+    {
+        initialiseSAADC();
+    }
+    
+    // Configure SAADC singled-ended channel, Internal reference (VDD/4) and 1/4 gain.
+    // Can use +- 3.3V
+    NRF_SAADC->CH[0].CONFIG = (SAADC_CH_CONFIG_GAIN_Gain1_4    << SAADC_CH_CONFIG_GAIN_Pos) |
+                              (SAADC_CH_CONFIG_MODE_SE         << SAADC_CH_CONFIG_MODE_Pos) |
+                              (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
+                              (SAADC_CH_CONFIG_RESN_Bypass     << SAADC_CH_CONFIG_RESN_Pos) |
+                              (SAADC_CH_CONFIG_RESP_Bypass     << SAADC_CH_CONFIG_RESP_Pos) |
+                              (SAADC_CH_CONFIG_TACQ_10us        << SAADC_CH_CONFIG_TACQ_Pos);
 
-    //     // Record our mode, so we can optimise later.
-    //     status |= IO_STATUS_ANALOG_IN;
-    // }
+    // Configure the SAADC channel with VDD as positive input, no negative input(single ended).
+    NRF_SAADC->CH[0].PSELP = ((unsigned long)channel) << SAADC_CH_PSELP_PSELP_Pos;
+    NRF_SAADC->CH[0].PSELN = SAADC_CH_PSELN_PSELN_NC << SAADC_CH_PSELN_PSELN_Pos;
+    
+    // Start the SAADC and wait for the started event.
+    NRF_SAADC->TASKS_START = 1;
+    while (NRF_SAADC->EVENTS_STARTED == 0);
+    NRF_SAADC->EVENTS_STARTED = 0;
 
-    // //perform a read!
-    // return (((AnalogIn *)pin)->read_u16() >> 6);
-    return DEVICE_NOT_IMPLEMENTED;
+    // Do a SAADC sample, will put the result in the configured RAM buffer.
+    NRF_SAADC->TASKS_SAMPLE = 1;
+    while (NRF_SAADC->EVENTS_END == 0);
+    NRF_SAADC->EVENTS_END = 0;
+
+    if(adcSample < 0) return 0;
+    else return adcSample;
 }
 
 /**

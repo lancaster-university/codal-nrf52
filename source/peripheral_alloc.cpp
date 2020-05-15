@@ -31,6 +31,9 @@ static const Peripheral peris[] = {
 #if defined(NRF_UARTE1)
     {NRF_UARTE1, UARTE1_IRQn, (PeripheralMode)PERI_MODE_UARTE},
 #endif
+#if defined(NRF_I2S)
+    {NRF_I2S, I2S_IRQn, (PeripheralMode)PERI_MODE_I2S},
+#endif
 };
 
 #define MAX_NUM_ALLOCATABLE_PERI (uint8_t)(sizeof(peris) / sizeof(peris[0]))
@@ -125,6 +128,9 @@ DEF_IRQ(SPIM3_IRQHandler, 4)
 #endif
 #if defined(NRF_UARTE1)
 DEF_IRQ(UARTE1_IRQHandler, 5)
+#endif
+#if defined(NRF_I2S)
+DEF_IRQ(I2S_IRQHandler, 6)
 #endif
 
 
