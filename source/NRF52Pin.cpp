@@ -317,7 +317,7 @@ int NRF52Pin::setAnalogValue(int value)
     status |= IO_STATUS_ANALOG_OUT;
 
     // set new value
-    pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (1 - (float)value / (float)DEVICE_PIN_MAX_OUTPUT));
+    pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (float)value / (float)DEVICE_PIN_MAX_OUTPUT);
 
     pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
 

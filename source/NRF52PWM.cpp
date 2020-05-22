@@ -3,6 +3,10 @@
 #include "cmsis.h"
 #include "CodalDmesg.h"
 
+// 10 bit
+#define SAMPLE_RESOLUTION 10
+#define SAMPLE_MAX_VAL ((1 << SAMPLE_RESOLUTION) - 1)
+
 // Handles on the instances of this class used the three PWM modules (if present)
 static NRF52PWM *nrf52_pwm_driver[3] = { NULL };
 
@@ -111,7 +115,7 @@ int NRF52PWM::getSampleRate()
  */
 int NRF52PWM::getSampleRange()
 {
-    return PWM.COUNTERTOP;
+    return SAMPLE_MAX_VAL;
 }
 
 /**
@@ -238,9 +242,16 @@ int NRF52PWM::pull()
     buffer = nextBuffer;
     nextBuffer = ManagedBuffer();
 
-    if (buffer.length()) {
-        PWM.SEQ[0].PTR = (uint32_t) &buffer[0];
-        PWM.SEQ[0].CNT = buffer.length() / 2;
+    uint32_t len = buffer.length() >> 1;
+    if (len) {
+        uint16_t *data = (uint16_t*) &buffer[0];
+        uint32_t mul = PWM.COUNTERTOP;
+        // assume unsigned 10 bit input data
+        for (uint32_t i = 0; i < len; ++i) {
+            data[i] = (SAMPLE_MAX_VAL - data[i]) * mul >> SAMPLE_RESOLUTION;
+        }
+        PWM.SEQ[0].PTR = (uint32_t) data;
+        PWM.SEQ[0].CNT = len;
         active = true;
         PWM.TASKS_SEQSTART[0] = 1;
     } else {
