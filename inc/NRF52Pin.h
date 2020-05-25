@@ -30,6 +30,7 @@ DEALINGS IN THE SOFTWARE.
 #include "CodalComponent.h"
 #include "Event.h"
 #include "NRF52PWM.h"
+#include "NRF52ADC.h"
 #include "MemorySource.h"
 
 #define ID_NRF52_PIN_HI  (DEVICE_ID_IO_P0 + 35)
@@ -51,6 +52,10 @@ namespace codal
 
     class NRF52Pin : public codal::Pin
     {
+     public:
+        static NRF52ADC* adc;
+
+     private:
         static MemorySource* pwmSource;
         static NRF52PWM* pwm;
         static uint16_t pwmBuffer[NRF52PIN_PWM_CHANNEL_MAP_SIZE];

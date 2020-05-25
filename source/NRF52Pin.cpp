@@ -59,6 +59,7 @@ uint16_t NRF52Pin::pwmBuffer[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {0,0,0,0};
 int8_t NRF52Pin::pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {-1,-1,-1,-1};
 uint8_t NRF52Pin::lastUsedChannel = 3;
 
+NRF52ADC* NRF52Pin::adc = NULL;
 
 #ifdef __cplusplus
 extern "C" {
@@ -381,23 +382,25 @@ int NRF52Pin::getAnalogValue()
 {
 
     // //check if this pin has an analogue mode...
-    // if(!(PIN_CAPABILITY_ANALOG & capability))
-    //     return DEVICE_NOT_SUPPORTED;
+    if(!(PIN_CAPABILITY_ANALOG & capability))
+        return DEVICE_NOT_SUPPORTED;
 
-    // // Move into an analogue input state if necessary.
-    // if (!(status & IO_STATUS_ANALOG_IN)){
-    //     disconnect();
-    //     NRF->ADC
-    //     // Enable input mode, and input buffer
-    //     NRF_P0->PIN_CNF[name] &= 0xfffffffc;
+    // Move into an analogue input state if necessary.
+    if (!(status & IO_STATUS_ANALOG_IN))
+    {
+         disconnect();
+         status |= IO_STATUS_ANALOG_IN;
+    }
 
-    //     // Record our mode, so we can optimise later.
-    //     status |= IO_STATUS_ANALOG_IN;
-    // }
+    if (adc)
+    {
+        NRF52ADCChannel *c = adc->getChannel(*this);
 
-    // //perform a read!
-    // return (((AnalogIn *)pin)->read_u16() >> 6);
-    return DEVICE_NOT_IMPLEMENTED;
+        if (c)
+            return c->getSample();
+    }
+
+    return DEVICE_NOT_SUPPORTED;
 }
 
 /**
