@@ -141,7 +141,6 @@ int NRF52ADCChannel::servicePendingRequests()
 
     if (status & NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE)
     {
-        DMESG("DEMUX: HARD_ENABLE %d", channel);
         NRF_SAADC->CH[channel].PSELP = channel+1;
         status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE;
         status |= NRF52_ADC_CHANNEL_STATUS_ENABLED;
@@ -150,7 +149,6 @@ int NRF52ADCChannel::servicePendingRequests()
 
     if (status & NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE)
     {
-        DMESG("DEMUX: HARD_DISABLE %d", channel);
         NRF_SAADC->CH[channel].PSELP = 0;
         NRF_SAADC->CH[channel].PSELN = 0;
         status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE;
@@ -167,10 +165,7 @@ int NRF52ADCChannel::servicePendingRequests()
 void NRF52ADCChannel::enable()
 {
     if (!isEnabled())
-    {
-        DMESG("NRF52ADC: ENABLING CHANNEL %d\n", channel);
         status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE;
-    }
 }
 
 
@@ -179,10 +174,8 @@ void NRF52ADCChannel::enable()
  */
 void NRF52ADCChannel::disable()
 {
-    if (isEnabled()){
-        DMESG("NRF52ADC: DISABLING CHANNEL %d\n", channel);
+    if (isEnabled())
         status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE;
-    }
 }
 
 /**
@@ -201,7 +194,6 @@ int NRF52ADCChannel::isEnabled()
  */
 void NRF52ADCChannel::connect(DataSink& component)
 {
-    DMESG("NRF52ADC: CONNECT");
     this->status |= NRF52_ADC_CHANNEL_STATUS_CONNECTED;
 }
 
@@ -283,8 +275,6 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip)
     uint16_t *end = data + length;
     data += offset;
 
-    DMESG("DEMUX: channel %d, length %d, buffer %p", channel, dmaBuffer.length(),&dmaBuffer[0]);
-
     if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0)
         return;
 
@@ -297,7 +287,6 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip)
     { 
         if (skip == 1)
         {
-            DMESG("DEMUX: channel %d ZERO COPY...", channel);
             // Optimise for a zero copy architeture for the common case of a single enabled stream.
             // Push the DMA buffer directly upstream and we're done.
             buffer = dmaBuffer;
@@ -306,8 +295,6 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip)
             output.pullRequest();
 
         }else {
-            
-            DMESG("DEMUX: channel %d DEMUXING...", channel);
             // Otherwise, we have to manually demultiplex the data stream...  
             uint16_t *ptr = (uint16_t *) &buffer[size];
             int l = buffer.length();
@@ -344,7 +331,6 @@ void NRF52ADCChannel::normalise()
     // Our buffer will be in signed 16bit format.
     if (format == DATASTREAM_FORMAT_16BIT_UNSIGNED)
     {
-        DMESG("NRF52ADC: NORMALIZE TO UNSIGNED16");
         int16_t *in = (int16_t *) &buffer[0];
         int16_t *end = in + buffer.length() / 2;
 
@@ -401,7 +387,6 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
     NVIC_ClearPendingIRQ(SAADC_IRQn);
     NVIC_EnableIRQ(SAADC_IRQn);
 
-    DMESG("NRF52ADC: ENABLING TIMER\n");
     timer.enableIRQ();
     timer.enable();
 }
@@ -409,8 +394,6 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
 
 void NRF52ADC::irq()
 {
-    DMESG("ADC:IRQ");
-    
     if (NRF_SAADC->EVENTS_END || NRF_SAADC->EVENTS_STOPPED)
     {
         // Snapshot the buffer we just received into
@@ -422,7 +405,6 @@ void NRF52ADC::irq()
         activeDMA = (activeDMA + 1) % 2;
 
         // truncate the buffer if we didn't fill it...
-        DMESG("DMA AMOUNT: %d", NRF_SAADC->RESULT.AMOUNT*2);
         dma[completeBuffer].truncate(NRF_SAADC->RESULT.AMOUNT*2);
 
         // Process the buffer.
@@ -451,7 +433,6 @@ void NRF52ADC::irq()
                 NRF_SAADC->ENABLE = 0;
                 NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels);        
                 NRF_SAADC->ENABLE = 1;
-                DMESG("NRF52ADC: IRQ: EVENTS_RESTART: PTR: %p MAXCNT: %d", NRF_SAADC->RESULT.PTR, NRF_SAADC->RESULT.MAXCNT);
                 NRF_SAADC->TASKS_START = 1;
             }
         }
@@ -468,7 +449,6 @@ void NRF52ADC::irq()
         int nextDMA = (activeDMA + 1) % 2;
         dma[nextDMA] = ManagedBuffer(bufferSize);
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[nextDMA][0];
-        DMESG("NRF52ADC: IRQ: EVENTS_STARTED: PTR: %p MAXCNT: %d", NRF_SAADC->RESULT.PTR, NRF_SAADC->RESULT.MAXCNT);
         NRF_SAADC->EVENTS_STARTED = 0;
     }
 
@@ -490,18 +470,13 @@ void NRF52ADC::enable()
 
     if (NRF_SAADC->ENABLE == 0 && enabledChannels > 0)
     {
-        DMESG("NRF52ADC: ENABLE\n");
-    
         // TODO: define MAXCNT to be a multiple of the number of active channels, to keep DMA transfers easy to manage.
         dma[activeDMA] = ManagedBuffer(bufferSize);
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[activeDMA][0];
         NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels); 
         NRF_SAADC->ENABLE = 1;
-        DMESG("ENABLE_START: PTR: %p MAXCNT: %d channels: %d bufferSize:%d", NRF_SAADC->RESULT.PTR, NRF_SAADC->RESULT.MAXCNT, enabledChannels,bufferSize);
 
         NRF_SAADC->TASKS_START = 1;
-
-        DMESG("SAADC STARTED");
     }
 }
 
@@ -510,7 +485,6 @@ void NRF52ADC::enable()
  */
 void NRF52ADC::disable()
 {
-    DMESG("NRF52ADC: DISABLE\n");
     // Schedule all DMA transfers to stop after the next DMA transaction completes.
     for (int i = 0; i < NRF52_ADC_CHANNELS; i++)
         channels[i].disable();
@@ -594,16 +568,12 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
     int c;
 
     if (!nrf52_saadc_id.hasKey(pin.name))
-    {
-        DMESGF("NRF52ADC: CHANNEL NOT FOUND");
         return NULL;
-    }
 
     c = nrf52_saadc_id.get(pin.name) - 1;
 
     if (!channels[c].isEnabled())
     {
-        DMESGF("NRF52ADC: ENABLING CHANNEL: %d", c);
         channels[c].enable();
         enabledChannels++;
 
@@ -621,7 +591,7 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
             NRF_SAADC->TASKS_STOP = 1;
         }
     }
-    DMESG("NRF52ADC: CHANNEL RETURNING");
+
     return &channels[c];
 }
 /**
