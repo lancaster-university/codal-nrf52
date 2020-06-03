@@ -197,10 +197,10 @@ int NRFLowLevelTimer::setClockSpeed(uint32_t speedKHz)
         return DEVICE_INVALID_PARAMETER;
 
     uint32_t clockSpeed = 16000;
-    uint8_t prescaleValue = 1;
+    uint8_t prescaleValue = 0;
 
     // snap to the lowest
-    for (prescaleValue = 1; prescaleValue < PRESCALE_VALUE_MAX; prescaleValue++)
+    for (prescaleValue = 0; prescaleValue < PRESCALE_VALUE_MAX; prescaleValue++)
     {
         uint32_t pow2 = 0x1 << prescaleValue;
 
