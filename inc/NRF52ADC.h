@@ -35,8 +35,7 @@ DEALINGS IN THE SOFTWARE.
 // Constants
 //
 #define NRF52_ADC_CHANNELS          8
-#define NRF52_ADC_DMA_SIZE          256
-#define NRF52_ADC_DEFAULT_GAIN      2
+#define NRF52_ADC_DMA_SIZE          512
 
 //
 // Event codes
@@ -49,12 +48,12 @@ using namespace codal;
 //
 // NRF52ADCChannel status codes
 //
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE    0x01
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE   0x02
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE    0x04
-#define NRF52_ADC_CHANNEL_STATUS_ENABLED         0x08
-#define NRF52_ADC_CHANNEL_STATUS_CONNECTED       0x10
-
+#define NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE           0x01
+#define NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE          0x02
+#define NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE           0x04
+#define NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED         0x08
+#define NRF52_ADC_CHANNEL_STATUS_ENABLED                0x10
+#define NRF52_ADC_CHANNEL_STATUS_CONNECTED              0x20
 
 class NRF52ADCChannel : public DataSource
 {
@@ -64,10 +63,8 @@ private:
     volatile int16_t    lastSample;
     int16_t             size;
     int16_t             bufferSize;
-    uint8_t             channel;
     volatile uint8_t    status;
-    uint8_t             format;
-
+    uint8_t             channel;
  
 public:
     DataStream      output;
@@ -106,7 +103,7 @@ public:
 
     /**
      * Defines the data format of the buffers streamed out of this component.
-     * @param format valid values include DATASTREAM_FORMAT_16BIT_SIGNED, DATASTREAM_FORMAT_16BIT_UNSIGNED
+     * @param format valid values include DATASTREAM_FORMAT_16BIT_SIGNED
      */
     virtual int setFormat(int format);
 
@@ -137,42 +134,45 @@ public:
     /**
      * Define the gain level for the analog input.
      *
-     * @param gain Value in the range 0..7. This corresponds to  the following gain being applied to the imput channel:
+     * @param gain Value in the range 0..7. This corresponds to the following gain being applied to the imput channel:
      *
      * 0: 1/6
      * 1: 1/5 
-     * 2: 1/4 
+     * 2: 1/4 (default)
      * 3: 1/3 
      * 4: 1/2 
      * 5: 1 
      * 6: 2 
      * 7: 4 
      *
-     * Default is defined by NRF52_ADC_DEFAULT_GAIN.
+     * @param bias Define the resistor bias used on this channel, in the range 0..3:
+     * 
+     * 0: No bias (default)
+     * 1: Activate pull down to ground
+     * 2: Activate pull up to VDD
+     * 3: Activate pull to VDD/2
      */
-    int setGain(int gain = NRF52_ADC_DEFAULT_GAIN);
+    int setGain(int gain = 2, int bias = 0);
     
     /**
-     * Demultiplexes the current DMA output buffer into the buffer of this channel.
-     * 
-     * @param data the DMA buffer to read from
-     * @param offset the offset into the buffer before the first sample
-     * @param skip the number of samples to skip between each read of the DMA buffer
-     */
-    void demux(ManagedBuffer data, int offset, int skip);
+    * Demultiplexes the current DMA output buffer into the buffer of this channel.
+    * 
+    * @param data the DMA buffer to read from
+    * @param offset the offset into the buffer before the first sample
+    * @param skip the number of samples to skip between each read of the DMA buffer
+    * @param oversample the number of samples to aggregate in sofware into a final result.
+    */
+    void demux(ManagedBuffer dmaBuffer, int offset, int skip, int oversample);
 
     /**
      * IRQ callback to activate/deactivate a pending channel
      * @return 1 if this channel changes status, ero otherwise.
      */
     int servicePendingRequests();
-
-private:
-    /**
-     * Ensures encoding of an output buffer is in the requested format before a pullrequest is issued.
-     */
-    void normalise();
 };
+
+#define NRF52ADC_STATUS_PERIOD_CHANGED              0x01        // Indicates that the period of the ADC may have changed.
+
 
 class NRF52ADC : public CodalComponent
 {
@@ -181,10 +181,12 @@ private:
 	uint32_t            samplePeriod;                           // The ADC sample period, in microseconds.
     uint16_t            bufferSize;                             // The size of our buffer.
     uint8_t             enabledChannels;                        // Determines the number of currently active channels.
-    NRFLowLevelTimer&   timer;                                  // The timer module used to drive this ADC.
-    NRF52ADCChannel     channels[NRF52_ADC_CHANNELS];
-    ManagedBuffer       dma[2];                                 // Double buffered DMA receive buffers.
     uint8_t             activeDMA;                              // Index of the DMA buffer being actively used.
+    NRFLowLevelTimer&   timer;                                  // The timer module used to drive this ADC.
+    NRF52ADCChannel     channels[NRF52_ADC_CHANNELS];           // ADC channel objects
+    ManagedBuffer       dma[2];                                 // Double buffered DMA receive buffers.
+    int                 softwareOversample;                     // The level of software oversampling level in use.
+
    
 public:
     /**

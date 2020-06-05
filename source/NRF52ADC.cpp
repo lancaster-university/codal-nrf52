@@ -29,8 +29,8 @@ DEALINGS IN THE SOFTWARE.
 #include "nrf.h"
 #include "cmsis.h"
 
-// Calculation to determine the optimal usable space for a DMA buffer fo rhte given number of channels
-#define NRF52ADC_DMA_ALIGNED_SIZED(c)   ((bufferSize - (bufferSize % (c * 2)))/2);
+// Calculation to determine the optimal usable space for a DMA buffer for the given number of channels
+#define NRF52ADC_DMA_ALIGNED_SIZED(c)   ((bufferSize - (bufferSize % (c * 2 * softwareOversample)))/2);
 
 //
 // Configuration to map a given pin to it's associated NRF52 analog ID.
@@ -65,20 +65,12 @@ extern "C" void SAADC_IRQHandler()
 NRF52ADCChannel::NRF52ADCChannel(uint8_t channel) : output(*this)
 {
     this->channel = channel;
-    this->size = 0;
+    this->size = buffer.length();
     this->bufferSize = NRF52_ADC_DMA_SIZE;
+    this->setGain();
     this->status = 0;
-    this->format = DATASTREAM_FORMAT_16BIT_SIGNED;
 
     this->disable();
-
-    // Configure for typical analogue capture settings
-    NRF_SAADC->CH[channel].CONFIG = (SAADC_CH_CONFIG_RESP_Bypass << SAADC_CH_CONFIG_RESP_Pos) |
-        (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
-        (SAADC_CH_CONFIG_GAIN_Gain1_2 << SAADC_CH_CONFIG_GAIN_Pos) |
-        (SAADC_CH_CONFIG_REFSEL_Internal << SAADC_CH_CONFIG_REFSEL_Pos) |
-        (SAADC_CH_CONFIG_TACQ_5us << SAADC_CH_CONFIG_TACQ_Pos) |
-        (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
 
     // Define our output stream as non-blocking.
     output.setBlocking(false);
@@ -89,20 +81,17 @@ NRF52ADCChannel::NRF52ADCChannel(uint8_t channel) : output(*this)
  */
 int NRF52ADCChannel::getFormat()
 {
-    return format;
+    return DATASTREAM_FORMAT_16BIT_SIGNED;
 }
 
 /**
  * Defines the data format of the buffers streamed out of this component.
- * @param format valid values include DATASTREAM_FORMAT_16BIT_SIGNED, DATASTREAM_FORMAT_16BIT_UNSIGNED
+ * @param format valid values include DATASTREAM_FORMAT_16BIT_SIGNED.
  */
 int NRF52ADCChannel::setFormat(int format)
 {
-    if (format == DATASTREAM_FORMAT_16BIT_SIGNED || format ==  DATASTREAM_FORMAT_16BIT_UNSIGNED)
-    {
-        this->format = format;
+    if (format == DATASTREAM_FORMAT_16BIT_SIGNED)
         return DEVICE_OK;
-    }
 
     return DEVICE_NOT_SUPPORTED;
 }
@@ -142,6 +131,7 @@ int NRF52ADCChannel::servicePendingRequests()
     if (status & NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE)
     {
         NRF_SAADC->CH[channel].PSELP = channel+1;
+        NRF_SAADC->CH[channel].PSELN = 0;
         status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE;
         status |= NRF52_ADC_CHANNEL_STATUS_ENABLED;
         result=1;
@@ -154,6 +144,12 @@ int NRF52ADCChannel::servicePendingRequests()
         status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE;
         status &= ~NRF52_ADC_CHANNEL_STATUS_ENABLED;
         result=1;
+    }
+
+    if (status & NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED)
+    {
+        status &= ~NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED;
+        result = 1;
     }
 
     return result;
@@ -232,31 +228,42 @@ uint16_t NRF52ADCChannel::getSample()
 /**
  * Define the gain level for the analog input.
  *
- * @param gain Value in the range 0..7. This corresponds to  the following gain being applied to the imput channel:
+ * @param gain Value in the range 0..7. This corresponds to the following gain being applied to the imput channel:
  *
  * 0: 1/6
- * 1: 1/5
- * 2: 1/4
- * 3: 1/3
- * 4: 1/2
- * 5: 1
- * 6: 2
- * 7: 4
+ * 1: 1/5 
+ * 2: 1/4 (default)
+ * 3: 1/3 
+ * 4: 1/2 
+ * 5: 1 
+ * 6: 2 
+ * 7: 4 
  *
- * Default is defined by NRF52_ADC_DEFAULT_GAIN.
+ * @param bias Define the resistor bias used on this channel, in the range 0..3:
+ * 
+ * 0: No bias (default)
+ * 1: Activate pull down to ground
+ * 2: Activate pull up to VDD
+ * 3: Activate pull to VDD/2
  */
-int NRF52ADCChannel::setGain(int gain)
+int NRF52ADCChannel::setGain(int gain, int bias)
 {
-    uint32_t r = NRF_SAADC->CH[channel].CONFIG & 0xfffff8ff;
-
-    if (gain < 0 || gain > 7)
+    // validate inputs
+    if (gain < 0 || gain > 7 || bias < 0 || bias > 3)
         return DEVICE_INVALID_PARAMETER;
 
-    // mask off the current gain setting.
-    r |= (gain << 8);
-
     // Update settings in the SAADC.
-    NRF_SAADC->CH[channel].CONFIG = r;
+    
+    NRF_SAADC->CH[channel].CONFIG = (bias << SAADC_CH_CONFIG_RESP_Pos) |
+        (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
+        (gain << SAADC_CH_CONFIG_GAIN_Pos) |
+        (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
+        (SAADC_CH_CONFIG_TACQ_3us << SAADC_CH_CONFIG_TACQ_Pos) |
+        (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
+
+
+    // inidcate that the ADC should be cycled at the next opportunity to start using the new settings
+    status |= NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED;
 
     return DEVICE_OK;
 }
@@ -267,20 +274,32 @@ int NRF52ADCChannel::setGain(int gain)
  * @param data the DMA buffer to read from
  * @param offset the offset into the buffer before the first sample
  * @param skip the number of samples to skip between each read of the DMA buffer
+ * @param oversample the number of samples to aggregate in sofware into a final result.
  */
-void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip)
+void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int oversample)
 {
     int length = dmaBuffer.length() / 2;
-    uint16_t *data = (uint16_t *) &dmaBuffer[0];
-    uint16_t *end = data + length;
+    int16_t *data = (int16_t *) &dmaBuffer[0];
+    int16_t *end = data + length;
     data += offset;
 
     if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0)
         return;
 
-    // Record the most recent sample, in case we're asked later.
-    lastSample = *(data + length - skip);
+    // If we were waiting for a discrete sample to arrive, indicate that it's ready.
     status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
+
+    // If this buffer is too shot to contain information for us, ignore it.
+    // n.b. The above test is safe, as a short buffer implies that our lastSample is already up to date.
+    if (length <= offset)
+        return;
+
+    // Rewind end pointer to our last sample in the buffer. (likley one iteration)
+    do end--;
+    while ((end - data) % skip);
+    
+    // Record the most recent sample, in case we're asked later.
+    lastSample = *end++;
 
     // Extract our channel data, if we're configured for data streaming.
     if (status & NRF52_ADC_CHANNEL_STATUS_CONNECTED)
@@ -291,12 +310,14 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip)
             // Push the DMA buffer directly upstream and we're done.
             buffer = dmaBuffer;
             size = buffer.length();
-            normalise();
             output.pullRequest();
 
         }else {
-            // Otherwise, we have to manually demultiplex the data stream...  
-            uint16_t *ptr = (uint16_t *) &buffer[size];
+            // Otherwise, we have to manually demultiplex the data stream... 
+            int sample = 0;
+            int sampleCount = 0;
+
+            int16_t *ptr = (int16_t *) &buffer[size];
             int l = buffer.length();
             while(data < end)
             {
@@ -304,40 +325,25 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip)
                 {
                     buffer = ManagedBuffer(bufferSize);
                     size = 0;
-                    ptr = (uint16_t *) &buffer[0];
+                    ptr = (int16_t *) &buffer[0];
                     l = buffer.length();
                 }
 
-                *ptr++ = *data;
+                sample += *data;
                 data += skip;
-                size +=2;
+                sampleCount++;
+
+                if (sampleCount == oversample)
+                {
+                    *ptr++ = (int16_t) (sample / oversample);
+                    sampleCount = 0;
+                    sample = 0;
+                    size += 2;
+                }
 
                 if (size == l)
-                {
-                    normalise();
                     output.pullRequest();
-                }
             }
-        }
-    }
-}
-
-/**
- * Ensures encoding of an output buffer is in the requested format before a pullrequest is issued.
- *
- */
-void NRF52ADCChannel::normalise()
-{
-    // Our buffer will be in signed 16bit format.
-    if (format == DATASTREAM_FORMAT_16BIT_UNSIGNED)
-    {
-        int16_t *in = (int16_t *) &buffer[0];
-        int16_t *end = in + buffer.length() / 2;
-
-        while(in < end)
-        {
-            *((uint16_t *)in) = *in > 0 ? (uint16_t) *in : 0;
-            in++; 
         }
     }
 }
@@ -353,6 +359,7 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
 {
     // Store our configuration data.
     this->id = id;
+    this->softwareOversample = 1;
     this->bufferSize = NRF52_ADC_DMA_SIZE;
 
     // Initialise receive buffers
@@ -367,28 +374,30 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
     NVIC_DisableIRQ(SAADC_IRQn);
     this->disable();
 
-     // Set samplerate
-    this->setSamplePeriod(samplePeriod);
+    // Enable 14 bit sampling (although it's rather nicely delivered as a 16 bit sample).
+    NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_14bit << SAADC_RESOLUTION_VAL_Pos);
 
-    // Enable 10 bit sampling (although it's rather nicely delivered as a 16 bit sample).
-    NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_10bit << SAADC_RESOLUTION_VAL_Pos);
-    NRF_SAADC->OVERSAMPLE = 0;
-
+    // Configure for an interrupt on ND and STOP events.
     NRF_SAADC->INTENSET = (SAADC_INTENSET_STARTED_Enabled << SAADC_INTENSET_STARTED_Pos) |
         (SAADC_INTENSET_END_Enabled << SAADC_INTENSET_END_Pos) |
         (SAADC_INTENSET_STOPPED_Enabled << SAADC_INTENSET_STOPPED_Pos );
 
+    // Configure a PPI channel to automatically launch a START event when an END event occurs
+    // (continuous sampling, with double buffered DMA)
     NRF_PPI->CH[0].EEP = (uint32_t) &NRF_SAADC->EVENTS_END;
     NRF_PPI->CH[0].TEP = (uint32_t) &NRF_SAADC->TASKS_START;
     NRF_PPI->CHENSET = 1;
+
+     // Set samplerate and calculate oversampling values
+    this->setSamplePeriod(samplePeriod);
 
     // Enable moderately high priority interrupt
     NVIC_SetPriority(SAADC_IRQn, 0);
     NVIC_ClearPendingIRQ(SAADC_IRQn);
     NVIC_EnableIRQ(SAADC_IRQn);
 
-    timer.enableIRQ();
     timer.enable();
+    timer.disableIRQ();
 }
 
 
@@ -413,7 +422,7 @@ void NRF52ADC::irq()
         for (int channel = 0; channel < NRF52_ADC_CHANNELS; channel++)
         {
             if (NRF_SAADC->CH[channel].PSELP)
-                channels[channel].demux(dma[completeBuffer], offset++, enabledChannels);
+                channels[channel].demux(dma[completeBuffer], offset++, enabledChannels, softwareOversample);
             
             // Callback 
             channelsChanged += channels[channel].servicePendingRequests();
@@ -424,14 +433,18 @@ void NRF52ADC::irq()
             NRF_SAADC->EVENTS_END = 0;
 
         // If we've been stopped, the number of active channels may have changed. 
-        // Recalculate DMA buffer size, ensure the our target DMA buffer sample count is a multiple of the channel count
+        // Recalculate DMA buffer size, ensure the our target DMA buffer sample count is a multiple of the channel count.
+        // Recalculate OVERSAMPLE and timer settings accordingly.
         if(NRF_SAADC->EVENTS_STOPPED){
             NRF_SAADC->EVENTS_STOPPED = 0;
          
-            if (channelsChanged > 0 && enabledChannels > 0)
+            if ((status & NRF52ADC_STATUS_PERIOD_CHANGED) || (channelsChanged > 0 && enabledChannels > 0))
             {
+                status &= ~NRF52ADC_STATUS_PERIOD_CHANGED;
+
                 NRF_SAADC->ENABLE = 0;
-                NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels);        
+                NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels);  
+                setSamplePeriod(samplePeriod);
                 NRF_SAADC->ENABLE = 1;
                 NRF_SAADC->TASKS_START = 1;
             }
@@ -475,7 +488,6 @@ void NRF52ADC::enable()
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[activeDMA][0];
         NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels); 
         NRF_SAADC->ENABLE = 1;
-
         NRF_SAADC->TASKS_START = 1;
     }
 }
@@ -509,6 +521,17 @@ int NRF52ADC::getSamplePeriod()
  */
 int NRF52ADC::setSamplePeriod(int samplePeriod)
 {
+    // Store the sample rate for later.
+    this->samplePeriod = samplePeriod;
+
+    // If ADC is running, simply cycle it, and we'll get called back in IRQ context. 
+    if (NRF_SAADC->ENABLE)
+    {
+        status |= NRF52ADC_STATUS_PERIOD_CHANGED;
+        NRF_SAADC->TASKS_STOP = 1;
+        return DEVICE_OK;
+    }
+
     // We use a generic timer to drive the ADC.
     // The ADC does have an internal clock, but only supports a single ADC channel, which is too limiting for us.
     // Why does it only support one channel? Who knows!  ¯\_(ツ)_/¯
@@ -516,24 +539,59 @@ int NRF52ADC::setSamplePeriod(int samplePeriod)
 
     // Configure as a fixed period timer for the required period
     timer.setMode(TimerMode::TimerModeTimer);
-    timer.setClockSpeed(1000000);
-    timer.setCompare(0, samplePeriod);
+    timer.setClockSpeed(16000);
+
+	// Calculate the best level of oversampling that can be achieved at the requested samplerate.
+	// The ADC can perform a sample and conversion in 5uS.
+	int oversample = 0;
+	int possibleSamples = samplePeriod / (5 * max(enabledChannels, 1));
+
+	// The ADC can support up to 256x oversampling, in a power of two boundary.
+	possibleSamples = min(possibleSamples, 256) >> 1;
+
+    // Calculate a lower bound for the level of oversampling we can support
+	while (possibleSamples != 0)
+	{
+		oversample++;
+		possibleSamples = possibleSamples >> 1;
+	}
+
+    // Determine the closest timer value for the requested period, taking into account oversampling.
+	float timerCount = (float) samplePeriod * 16.0f;
+
+    // Update the ADC and timer hardware with the new configuration.
+    // n.b. the nrf52 ADC only supports hardware oversampling for one channel... 
+    // so use software oversampling if multiple channels are enabled.
+    if (enabledChannels <= 1)
+    {
+        timerCount = timerCount / (1 << oversample);
+
+        NRF_SAADC->OVERSAMPLE = oversample;
+        softwareOversample = 1;
+    }
+    else
+    {
+        NRF_SAADC->OVERSAMPLE = 0;
+#if CONFIG_ENABLED(NRF52ADC_SOFTWARE_OVERSAMPLING)
+        oversample = min(oversample, 8);
+        softwareOversample = 1 << oversample;
+        timerCount = timerCount / (1 << oversample);
+#endif
+    }
+        
+    timer.setCompare(0, (int)timerCount);
     
     // Enable auto-reset
     timer.timer->SHORTS = 0x00000001;
 
     // use a PPI channel to link the timer overflow event with the ADC START task.
     // TODO: Add PPI channel to the resource registry...
-    
     NRF_PPI->CH[1].EEP = (uint32_t) &timer.timer->EVENTS_COMPARE[0];
     NRF_PPI->CH[1].TEP = (uint32_t) &NRF_SAADC->TASKS_SAMPLE;
     NRF_PPI->CHENSET = 2;
 
     // Reset the timer.
     timer.timer->TASKS_CLEAR = 1;
-
-    // Store the sample rate for later.
-    this->samplePeriod = samplePeriod;
 
     return DEVICE_OK;
 }
