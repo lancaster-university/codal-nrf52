@@ -60,6 +60,7 @@ int8_t NRF52Pin::pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE] = {-1,-1,-1,-1};
 uint8_t NRF52Pin::lastUsedChannel = 3;
 
 NRF52ADC* NRF52Pin::adc = NULL;
+TouchSensor* NRF52Pin::touchSensor = NULL;
 
 #ifdef __cplusplus
 extern "C" {
@@ -148,7 +149,7 @@ void NRF52Pin::disconnect()
     if (status & IO_STATUS_TOUCH_IN)
     {
         if (obj)
-            delete ((Button*)obj);
+            delete ((TouchButton*)obj);
     }
 
     if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE))
@@ -473,11 +474,11 @@ int NRF52Pin::isTouched()
     // Move into a touch input state if necessary.
     if (!(status & IO_STATUS_TOUCH_IN)){
         disconnect();
-        obj = new Button(*this, id);
+        obj = new TouchButton(*this, *touchSensor);
         status |= IO_STATUS_TOUCH_IN;
     }
 
-    return ((Button *)obj)->isPressed();
+    return ((TouchButton *)obj)->isPressed();
 }
 
 /**

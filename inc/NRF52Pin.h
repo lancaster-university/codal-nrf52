@@ -31,6 +31,7 @@ DEALINGS IN THE SOFTWARE.
 #include "Event.h"
 #include "NRF52PWM.h"
 #include "NRF52ADC.h"
+#include "TouchButton.h"
 #include "MemorySource.h"
 
 #define ID_NRF52_PIN_HI  (DEVICE_ID_IO_P0 + 35)
@@ -54,7 +55,8 @@ namespace codal
     {
      public:
         static NRF52ADC* adc;
-
+        static TouchSensor *touchSensor;
+        
      private:
         static MemorySource* pwmSource;
         static NRF52PWM* pwm;
