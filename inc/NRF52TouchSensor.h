@@ -34,7 +34,7 @@ DEALINGS IN THE SOFTWARE.
 
 #define NRF52_TOUCH_SENSOR_PERIOD           1000                             // The period between each sensing cycle (uS)
 #define NRF52_TOUCH_SENSE_SAMPLE_MAX        (NRF52_TOUCH_SENSOR_PERIOD*16)   // The maximum sample value returned (if the pin never raises)
-#define NRF52_TOUCH_SENSOR_PPI_CHANNEL      3           
+#define NRF52_TOUCH_SENSOR_PPI_CHANNEL      2           
 #define NRF52_TOUCH_SENSOR_GPIOTE_CHANNEL   0
 
 
