@@ -91,10 +91,12 @@ public:
     int isEnabled();
 
 
-	/**
+    /**
      * Update our reference to a downstream component.
-	 */
-	virtual void connect(DataSink &sink);
+     *
+     * @param component The new downstream component for this ADC.
+     */
+	virtual void connect(DataSink &component);
 
     /**
      *  Determine the data format of the buffers streamed out of this component.

@@ -182,11 +182,11 @@ int NRF52ADCChannel::isEnabled()
     return status & NRF52_ADC_CHANNEL_STATUS_ENABLED;
 }
 
+
 /**
  * Update our reference to a downstream component.
- * Pass through any connect requests to our output buffer component.
  *
- * @param component The new downstream component for this microhone audio source.
+ * @param component The new downstream component for this ADC.
  */
 void NRF52ADCChannel::connect(DataSink& component)
 {
