@@ -18,20 +18,21 @@ class NRF52PWM : public CodalComponent, public DataSink
 {
 
 private:
-    NRF_PWM_Type    &PWM;
-    bool            enabled;
-    bool            active;
-    int             dataReady;
+    NRF_PWM_Type    &PWM;                   // The hardware PWM module used by this instance
+    bool            enabled;                // Determines if this PWM instance is enabled
+    bool            active;                 // Determines if this PWM instance is actively generating output
+    bool            streaming;              // Determines if the output is streamed, or discrete. Streamed mode maintains ordered, discrete repeats playout most recent data provided.
+    int             dataReady;              // Count of the number of input buffers awaiting playout
     int             sampleRate;
-    int             periodUs;
-
-    void prefill();
+    int             periodUs;               // Period between output samples, in microseconds
+    uint8_t         bufferPlaying;          // ID of the buffer currently being played (0 or 1). Output is hardware double buffered.
+    ManagedBuffer   buffer[2];              // The ManagedBuffers currently being used by the PWN hardware
 
 public:
 
     // The stream component that is serving our data
-    DataSource  &upstream;
-    ManagedBuffer buffer, nextBuffer;
+    DataSource      &upstream;
+    
 
     /**
       * Constructor for an instance of a PWM acting as a sink to a given (likely DMA enabled) datastream.
@@ -47,11 +48,6 @@ public:
      * Callback provided when data is ready.
      */
 	virtual int pullRequest();
-
-    /**
-     * Pull down a buffer from upstream, and schedule a DMA transfer from it.
-     */
-    int pull();
 
     /**
      * Determine the DAC playback sample rate to the given frequency.
@@ -101,11 +97,11 @@ public:
     int setDecoderMode(uint32_t mode);
  
     /**
-     * Defines if the PWM modules should repeat the previous sample when the end of the stream is reached.
+     * Defines if the PWM module should maintain playout ordering of buffers, or always play the most recent buffer provided.
      * 
-     * @ param repeat if true, the last PWM sample received is repeated if the stream underflows. If false, the PWM module will stop processing on stream underflow.
+     * @ param streamingMode If true, buffers will be streamed in order they are received. If false, the most recent buffer supplied always takes prescedence.
      */
-    void setLoop(bool repeat);
+    void setStreamingMode(bool streamingMode);
 
     /**
      * Interrupt callback when playback of DMA buffer has completed
@@ -127,6 +123,12 @@ public:
      */
     int
     connectPin(Pin &pin, int channel);
+
+    private:
+    /**
+     * Pull a buffer into the given double buffer slot, if one is available.
+     */
+    int tryPull(uint8_t b);
 
 };
 

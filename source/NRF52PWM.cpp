@@ -33,6 +33,8 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     this->id = id;
     this->dataReady = 0;
     this->active = false;
+    this->streaming = true;
+    this->bufferPlaying = 0;
 
     // Ensure PWM is currently disabled.
     disable();
@@ -43,9 +45,6 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     // Configure for a repeating, edge aligned PWM pattern.
     PWM.MODE = PWM_MODE_UPDOWN_Up;
 
-    // Configure for a single pass over the data
-    PWM.LOOP = 0;
-
     // By default, enable control of four independent channels
     setDecoderMode(PWM_DECODER_LOAD_Individual);
 
@@ -55,9 +54,8 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     PWM.SEQ[1].ENDDELAY = 0;
     PWM.SEQ[0].ENDDELAY = 0;
 
-    /* Enable interrupts */
-    PWM.INTENSET = (PWM_INTEN_SEQEND0_Enabled << PWM_INTEN_SEQEND0_Pos )
-                |  (PWM_INTEN_SEQEND1_Enabled << PWM_INTEN_SEQEND1_Pos );
+    // Default to streaming mode.
+    setStreamingMode(true);
 
     // Route an interrupt to this object
     // This is heavily unwound, but non trivial to remove this duplication given all the constants...
@@ -190,13 +188,46 @@ int NRF52PWM::setDecoderMode(uint32_t mode)
 }
  
 /**
- * Defines if the PWM modules should repeat the previous sample when the end of the stream is reached.
+ * Defines if the PWM module should maintain playout ordering of buffers, or always play the most recent buffer provided.
  * 
- * @ param repeat if true, the last PWM sample received is repeated if the stream underflows. If false, the PWM module will stop processing on stream underflow.
+ * @ param streamingMode If true, buffers will be streamed in order they are received. If false, the most recent buffer supplied always takes prescedence.
  */
-void setLoop(bool repeat)
+void NRF52PWM::setStreamingMode(bool streamingMode)
 {
-    //TODO
+    this->streaming = streamingMode;
+
+    if (streaming)
+    {
+        PWM.LOOP = 1;
+        PWM.SHORTS = PWM_SHORTS_LOOPSDONE_SEQSTART0_Enabled << PWM_SHORTS_LOOPSDONE_SEQSTART0_Pos; 
+        PWM.INTENSET = (PWM_INTEN_SEQEND0_Enabled << PWM_INTEN_SEQEND0_Pos ) | (PWM_INTEN_SEQEND1_Enabled << PWM_INTEN_SEQEND1_Pos);
+    }
+    else
+    {
+        PWM.LOOP = 0;
+        PWM.SHORTS = 0; 
+        PWM.INTENCLR = (PWM_INTEN_SEQEND0_Enabled << PWM_INTEN_SEQEND0_Pos ) | (PWM_INTEN_SEQEND1_Enabled << PWM_INTEN_SEQEND1_Pos);
+    }
+}
+
+/**
+ * Pull a buffer into the given double buffer slot, if one is available.
+ * @param b The buffer to fill (either 0 or 1)
+ * @return the number of buffers succesfully filled.
+ */
+int NRF52PWM::tryPull(uint8_t b)
+{
+    if (dataReady){
+        buffer[b] = upstream.pull();
+        PWM.SEQ[b].PTR = (uint32_t) buffer[b].getBytes();
+        PWM.SEQ[b].CNT = buffer[b].length() / 2;
+
+        dataReady--;
+
+        return 1;
+    }
+
+    return 0;
 }
 
 /**
@@ -206,50 +237,35 @@ int NRF52PWM::pullRequest()
 {
     dataReady++;
 
-    if (!active)
-        pull();
-
-    return DEVICE_OK;
-}
-
-void NRF52PWM::prefill()
-{
-    if (!dataReady)
-        return;
-
-    dataReady--;
-    if (!active) {
-        active = true;
-        nextBuffer = upstream.pull();
-        active = false;
-    } else {
-        nextBuffer = upstream.pull();
-    }
-}
-
-/**
- * Pull down a buffer from upstream, and schedule a DMA transfer from it.
- */
-int NRF52PWM::pull()
-{
-    if (!nextBuffer.length())
-        prefill();
-
-    buffer = nextBuffer;
-    nextBuffer = ManagedBuffer();
-
-    if (buffer.length()) {
-        PWM.SEQ[0].PTR = (uint32_t) &buffer[0];
-        PWM.SEQ[0].CNT = buffer.length() / 2;
-        active = true;
+    // If we're not running in streaming mode, simply pull the requested buffer and schedule for DMA.
+    if (!streaming)
+    {
+        tryPull(0);
         PWM.TASKS_SEQSTART[0] = 1;
-    } else {
-        dataReady = 0;
-        active = false;
-        return DEVICE_OK;
     }
 
-    prefill(); // pre-fetch next buffer
+    // If we're in streaming mode, ensure that we've preloaded both double buffers before initiating playout.
+    // note: care needed here, as our upstream data source MAY recursively call pullRequest() again in response to us
+    // pulling the first buffer...
+    if (streaming && !active)
+    {
+        active = true;
+
+        tryPull(bufferPlaying);
+        bufferPlaying = (bufferPlaying + 1) % 2;
+
+        if (bufferPlaying !=0 && dataReady)
+        {
+            tryPull(bufferPlaying);
+            bufferPlaying = (bufferPlaying + 1) % 2;
+        }
+
+        // Check if we've preloaded both buffers
+        if (bufferPlaying == 0)
+            PWM.TASKS_SEQSTART[0] = 1;
+        else
+            active = false;
+    }
 
     return DEVICE_OK;
 }
@@ -262,20 +278,18 @@ void NRF52PWM::irq()
     // once the sequence has finished playing, load up the next buffer.
     if (PWM.EVENTS_SEQEND[0])
     {
-        if (dataReady)
-            pull();
-        else
-            active = false;
+        bufferPlaying = 1;
+        tryPull(0);
 
         PWM.EVENTS_SEQEND[0] = 0;
-        // Spurious read to cover the "events don't clear immediately" erratum
-        (void) PWM.EVENTS_SEQEND[0];
     }
 
     if (PWM.EVENTS_SEQEND[1])
     {
+        bufferPlaying = 0;
+        tryPull(1);
+
         PWM.EVENTS_SEQEND[1] = 0;
-        (void) PWM.EVENTS_SEQEND[1];
     }
 }
 
