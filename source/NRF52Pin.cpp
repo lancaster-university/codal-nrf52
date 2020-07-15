@@ -271,10 +271,16 @@ int NRF52Pin::getDigitalValue(PullMode pull)
 int NRF52Pin::initialisePWM()
 {
     if (pwmSource == NULL)
-        pwmSource = new MemorySource(65535);
+    {
+        pwmSource = new MemorySource();
+        pwmSource->setFormat(DATASTREAM_FORMAT_16BIT_UNSIGNED);
+    }
 
     if (pwm == NULL)
-        pwm = new NRF52PWM(NRF_PWM0, pwmSource->output, 1600);
+    {
+        pwm = new NRF52PWM(NRF_PWM0, pwmSource->output, 50);
+        pwm->setStreamingMode(false);
+    }
 
     return DEVICE_OK;
 }
@@ -319,8 +325,7 @@ int NRF52Pin::setAnalogValue(int value)
     status |= IO_STATUS_ANALOG_OUT;
 
     // set new value
-    pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (1 - (float)value / (float)DEVICE_PIN_MAX_OUTPUT));
-
+    pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (1 - (float)value / (float)(DEVICE_PIN_MAX_OUTPUT+1)));
     pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
 
     return DEVICE_OK;
@@ -523,8 +528,7 @@ int NRF52Pin::setAnalogPeriodUs(int period)
             pwmBuffer[i] = (uint16_t) v;
         }
 
-        pwmSource->setMaximumSampleValue(pwm->getSampleRange());
-        pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
+        pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE);
 
         return DEVICE_OK;
     }
