@@ -114,6 +114,11 @@ public:
       * @return DEVICE_OK or DEVICE_I2C_ERROR if the the read request failed.
       */
     virtual int readRegister(uint16_t address, uint8_t reg, uint8_t *data, int length, bool repeated = true);
+
+    /**
+      * Clear I2C bus
+      */ 
+    void clearBus();
 };
 } // namespace codal
 

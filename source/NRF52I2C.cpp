@@ -20,6 +20,9 @@ NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal:
     if (!p_twim)
         target_panic(DEVICE_HARDWARE_CONFIGURATION_ERROR);
 
+    // Ensure all I2C drivers on the bus are fully reset
+    clearBus();
+
     // put pins in input mode
     sda.getDigitalValue(PullMode::Up);
     scl.getDigitalValue(PullMode::Up);
@@ -32,6 +35,39 @@ NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal:
 
     target_wait_us(10);
 }
+
+/**
+ * Clear I2C bus. Derived from:
+ * https://github.com/NordicSemiconductor/Nordic-Thingy52-FW/blob/126120108879d5bf5d202c9d5cab65e4e9041f58/external/sdk13/components/drivers_nrf/twi_master/nrf_drv_twi.c#L203
+ */
+void NRF52I2C::clearBus() {
+    scl.setDigitalValue(1);
+    sda.setDigitalValue(1);
+
+    target_wait_us(4);
+
+    for (int i = 0; i < 9; i++)
+    {
+        if (sda.getDigitalValue(PullMode::Up))
+        {
+            if (i == 0)
+                return;
+            else
+                break;
+        }
+
+        scl.setDigitalValue(0);
+        target_wait_us(4);
+
+        scl.setDigitalValue(1);
+        target_wait_us(4);
+    }
+    sda.setDigitalValue(0);
+    target_wait_us(4);
+    
+    sda.setDigitalValue(1);
+}
+
 
 /** Set the frequency of the I2C interface
  *
