@@ -24,7 +24,7 @@ DEALINGS IN THE SOFTWARE.
 
 #include "CodalCompat.h"
 #include "CodalUtil.h"
-#include "CodalDMESG.h"
+#include "CodalDmesg.h"
 #include "NRF52ADC.h"
 #include "nrf.h"
 #include "cmsis.h"
