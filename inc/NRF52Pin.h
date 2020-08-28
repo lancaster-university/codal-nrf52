@@ -378,6 +378,13 @@ namespace codal
          * Note, that this is overwritten in hardware-specific classes to check the condition immedietly before changing the pin value.
          */
         virtual int getAndSetDigitalValue(int value);
+
+        /**
+         * Configures the Enables/Disables this pin's DETECT event
+         * @param enable The new value of this pin's DETECT sense configuration 
+         * Valid values are GPIO_PIN_CNF_SENSE_Disabled, GPIO_PIN_CNF_SENSE_High, GPIO_PIN_CNF_SENSE_Low
+         */
+        void setDetect(int enable);
     };
 }
 

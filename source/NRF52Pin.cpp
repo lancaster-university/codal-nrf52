@@ -834,3 +834,14 @@ int NRF52Pin::getAndSetDigitalValue(int value)
 
     return 0;
 }
+
+/**
+ * Configures the Enables/Disables this pin's DETECT event
+ * @param enable The new value of this pin's DETECT sense configuration 
+ * Valid values are GPIO_PIN_CNF_SENSE_Disabled, GPIO_PIN_CNF_SENSE_High, GPIO_PIN_CNF_SENSE_Low
+ */
+void NRF52Pin::setDetect(int enable)
+{
+    PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
+    PORT->PIN_CNF[PIN] |= (enable << GPIO_PIN_CNF_SENSE_Pos);
+}
