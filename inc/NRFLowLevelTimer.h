@@ -41,6 +41,8 @@ namespace codal
         virtual int setClockSpeed(uint32_t speedKHz);
 
         virtual int setBitMode(TimerBitMode t);
+
+        virtual int setSleep(bool doSleep) override;
     };
 }
 

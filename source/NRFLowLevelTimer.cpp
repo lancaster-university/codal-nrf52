@@ -236,3 +236,24 @@ int NRFLowLevelTimer::setBitMode(TimerBitMode t)
     this->bitMode = t;
     return DEVICE_OK;
 }
+
+
+int NRFLowLevelTimer::setSleep(bool doSleep)
+{
+    static bool irqWasEnabled = false;
+
+    if (doSleep)
+    {
+        irqWasEnabled = NVIC_GetEnableIRQ(irqn);
+        if (irqWasEnabled)
+            disableIRQ();
+    }
+
+    if (!doSleep)
+    {
+        if (irqWasEnabled)
+            enableIRQ();
+    }
+
+    return DEVICE_OK;
+}
