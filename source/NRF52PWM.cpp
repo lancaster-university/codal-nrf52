@@ -3,29 +3,29 @@
 #include "cmsis.h"
 #include "CodalDmesg.h"
 
-// Handles on the instances of this class used the three PWM modules (if present)
-static NRF52PWM *nrf52_pwm_driver[3] = { NULL };
-
 void nrf52_pwm0_irq(void)
 {
     // Simply pass on to the driver component handler.
-    if (nrf52_pwm_driver[0])
-        nrf52_pwm_driver[0]->irq();
+    if (NRF52PWM::nrf52_pwm_driver[0])
+        NRF52PWM::nrf52_pwm_driver[0]->irq();
 }
 
 void nrf52_pwm1_irq(void)
 {
     // Simply pass on to the driver component handler.
-    if (nrf52_pwm_driver[1])
-        nrf52_pwm_driver[1]->irq();
+    if (NRF52PWM::nrf52_pwm_driver[1])
+        NRF52PWM::nrf52_pwm_driver[1]->irq();
 }
 
 void nrf52_pwm2_irq(void)
 {
     // Simply pass on to the driver component handler.
-    if (nrf52_pwm_driver[2])
-        nrf52_pwm_driver[2]->irq();
+    if (NRF52PWM::nrf52_pwm_driver[2])
+        NRF52PWM::nrf52_pwm_driver[2]->irq();
 }
+
+// Handles on the instances of this class used the three PWM modules (if present)
+NRF52PWM* NRF52PWM::nrf52_pwm_driver[NRF52PWM_PWM_PERIPHERALS] = { NULL };
 
 NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uint16_t id) : PWM(*module), upstream(source)
 {
@@ -317,8 +317,27 @@ void NRF52PWM::disable()
 int
 NRF52PWM::connectPin(Pin &pin, int channel)
 {
+    if (channel >= NRF52PWM_PWM_CHANNELS)
+        return DEVICE_INVALID_PARAMETER;
+
+    pin.disconnect();
     pin.setDigitalValue(0);
     PWM.PSEL.OUT[channel] = pin.name;
 
+    pin.status |= IO_STATUS_ANALOG_OUT;
+    return DEVICE_OK;
+}
+
+/**
+ * Direct output of given PWM channel to the given pin
+ */
+int
+NRF52PWM::disconnectPin(Pin &pin)
+{
+    for (int channel = 0; channel < NRF52PWM_PWM_CHANNELS; channel++)
+        if (PWM.PSEL.OUT[channel] == pin.name)
+            PWM.PSEL.OUT[channel] = 0xFFFFFFFF;
+
+    pin.status &= ~IO_STATUS_ANALOG_OUT;
     return DEVICE_OK;
 }

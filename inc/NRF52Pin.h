@@ -106,7 +106,7 @@ namespace codal
           *
           * Used only when pin changes mode (i.e. Input/Output/Analog/Digital)
           */
-        void disconnect();
+        virtual void disconnect() override;
 
         void rise();
         void fall();
@@ -264,6 +264,11 @@ namespace codal
              * @endcode
              */
         int isTouched();
+
+        /**
+         * If this pin is configured as a capacitative touch input, perform a calibration on the input.
+         */
+        void touchCalibrate();
 
         /**
              * Configures this IO pin as an analog/pwm output if it isn't already, configures the period to be 20ms,

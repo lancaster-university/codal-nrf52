@@ -1,7 +1,7 @@
 #include "CodalConfig.h"
 #include "codal-core/inc/types/Event.h"
 #include "Timer.h"
-#include "Pin.h"
+#include "NRF52Pin.h"
 #include "DataStream.h"
 #include "nrf.h"
 
@@ -11,6 +11,10 @@
 #ifndef NRF52PWM_DEFAULT_FREQUENCY
 #define NRF52PWM_DEFAULT_FREQUENCY 16000
 #endif
+
+#define NRF52PWM_PWM_PERIPHERALS    3
+#define NRF52PWM_PWM_CHANNELS       4
+
 
 using namespace codal;
 
@@ -32,6 +36,9 @@ public:
 
     // The stream component that is serving our data
     DataSource      &upstream;
+
+    // Handles on the instances of this class used the three PWM modules (if present)
+    static NRF52PWM *nrf52_pwm_driver[NRF52PWM_PWM_PERIPHERALS];
     
 
     /**
@@ -123,6 +130,12 @@ public:
      */
     int
     connectPin(Pin &pin, int channel);
+
+    /**
+     * Disconnect the given pin from any PWM channels it has allocated.
+     */
+    int
+    disconnectPin(Pin &pin);
 
     private:
     /**

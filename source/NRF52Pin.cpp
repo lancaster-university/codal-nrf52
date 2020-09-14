@@ -141,15 +141,34 @@ NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pi
   */
 void NRF52Pin::disconnect()
 {
-    if (status & IO_STATUS_ANALOG_IN)
+    if (status & IO_STATUS_ANALOG_OUT)
     {
+        // Scan the NRF52 PWM modules to determine if this pin is connected to any of them. If so,
+        // disconnect from the peripheral. We scan here as there may be multiple PWM peripherals in use,
+        // beyond the PWM module normally used by this class.
+        for (int p = 0; p < NRF52PWM_PWM_PERIPHERALS; p++)
+        {
+            if (NRF52PWM::nrf52_pwm_driver[p])
+            {
+                NRF52PWM::nrf52_pwm_driver[p]->disconnectPin(*this);    
 
+                // If this pin was attaced to the analog funcitons in this class, clear any cached state.
+                if ( NRF52PWM::nrf52_pwm_driver[p] == pwm)
+                    for (int i = 0; i < NRF52PWM_PWM_CHANNELS; i++)
+                        if (pwmChannelMap[i] == name)
+                            pwmChannelMap[i] = -1;
+            }
+        }
+
+        status &= ~IO_STATUS_ANALOG_OUT;
     }
 
     if (status & IO_STATUS_TOUCH_IN)
     {
         if (obj)
             delete ((TouchButton*)obj);
+
+        status &= ~IO_STATUS_TOUCH_IN;
     }
 
     if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE))
@@ -485,6 +504,16 @@ int NRF52Pin::isTouched()
 
     return ((TouchButton *)obj)->isPressed();
 }
+
+/**
+ * If this pin is configured as a capacitative touch input, perform a calibration on the input.
+ */
+void NRF52Pin::touchCalibrate()
+{
+    if (status & IO_STATUS_TOUCH_IN)
+        ((TouchButton *)obj)->calibrate();
+}
+
 
 /**
   * Configures this IO pin as an analog/pwm output if it isn't already, configures the period to be 20ms,
