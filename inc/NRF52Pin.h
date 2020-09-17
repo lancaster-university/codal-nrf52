@@ -41,6 +41,10 @@ DEALINGS IN THE SOFTWARE.
 
 #define NRF52PIN_PWM_CHANNEL_MAP_SIZE        4
 
+#ifndef CAPTOUCH_DEFAULT_CALIBRATION
+#define CAPTOUCH_DEFAULT_CALIBRATION        -1
+#endif
+
 /**
   * Class definition for Pin.
   *

@@ -537,7 +537,7 @@ int NRF52Pin::isTouched(TouchMode touchMode)
 
         if (touchMode == TouchMode::Capacitative)
         {
-            obj = new TouchButton(*this, *touchSensor);
+            obj = new TouchButton(*this, *touchSensor, CAPTOUCH_DEFAULT_CALIBRATION);
             status |= IO_STATUS_CAPACITATIVE_TOUCH;
         }
         else
