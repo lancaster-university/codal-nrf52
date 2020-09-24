@@ -40,7 +40,6 @@ namespace codal
         protected:
         virtual int enableInterrupt(SerialInterruptType t) override;
         virtual int disableInterrupt(SerialInterruptType t) override;
-        virtual int setBaudrate(uint32_t baudrate) override;
         virtual int configurePins(Pin& tx, Pin& rx) override;
 
         public:
@@ -57,6 +56,7 @@ namespace codal
 
         virtual int putc(char) override;
         virtual int getc() override;
+        virtual int setBaudrate(uint32_t baudrate) override;
 
         ~NRF52Serial();
     };
