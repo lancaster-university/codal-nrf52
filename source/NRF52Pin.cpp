@@ -300,7 +300,7 @@ int NRF52Pin::initialisePWM()
 
     if (pwm == NULL)
     {
-        pwm = new NRF52PWM(NRF_PWM0, pwmSource->output, 50);
+        pwm = new NRF52PWM(NRF_PWM0, *pwmSource, 50);
         pwm->setStreamingMode(false);
     }
 
@@ -348,7 +348,7 @@ int NRF52Pin::setAnalogValue(int value)
 
     // set new value
     pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (1 - (float)value / (float)(DEVICE_PIN_MAX_OUTPUT+1)));
-    pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
+    pwmSource->playAsync(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
 
     return DEVICE_OK;
 }
