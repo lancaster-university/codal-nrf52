@@ -580,7 +580,7 @@ void NRF52Pin::touchCalibrate()
   * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if value is out of range, or DEVICE_NOT_SUPPORTED
   *         if the given pin does not have analog capability.
   */
-int NRF52Pin::setServoPulseUs(int pulseWidth)
+int NRF52Pin::setServoPulseUs(uint32_t pulseWidth)
 {
     initialisePWM();
 
@@ -597,7 +597,7 @@ int NRF52Pin::setServoPulseUs(int pulseWidth)
   *
   * @return DEVICE_OK on success.
   */
-int NRF52Pin::setAnalogPeriodUs(int period)
+int NRF52Pin::setAnalogPeriodUs(uint32_t period)
 {
     if (status & IO_STATUS_ANALOG_OUT)
     {
