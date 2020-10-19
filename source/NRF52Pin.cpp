@@ -348,7 +348,7 @@ int NRF52Pin::setAnalogValue(int value)
 
     // set new value
     pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (1 - (float)value / (float)(DEVICE_PIN_MAX_OUTPUT+1)));
-    pwmSource->playAsync(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE, 0);
+    pwmSource->playAsync(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE * sizeof(uint16_t));
 
     return DEVICE_OK;
 }
@@ -613,7 +613,7 @@ int NRF52Pin::setAnalogPeriodUs(uint32_t period)
             pwmBuffer[i] = (uint16_t) v;
         }
 
-        pwmSource->play(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE);
+        pwmSource->playAsync(pwmBuffer, NRF52PIN_PWM_CHANNEL_MAP_SIZE * sizeof(uint16_t));
 
         return DEVICE_OK;
     }
