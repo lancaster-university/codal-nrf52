@@ -32,7 +32,8 @@ public:
     virtual int enableTx(bool) = 0;
     virtual int enableRx(bool) = 0;
 
-    virtual int sendDMA(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
+    virtual int startSend(const uint8_t *data, int len, DMASerialCallback doneHandler,
+                          void *doneArg)
     {
         if (!data || len <= 0)
             return DEVICE_INVALID_PARAMETER;
@@ -46,7 +47,7 @@ public:
         return DEVICE_OK;
     }
 
-    virtual int receiveDMA(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
+    virtual int startReceive(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
     {
         if (!data || len <= 0)
             return DEVICE_INVALID_PARAMETER;
@@ -61,6 +62,10 @@ public:
     }
 
     virtual int abortDMA() = 0;
+
+    // these two schedule() until transmission is complete
+    int send(uint8_t *data, int len);
+    int receive(uint8_t *data, int len);
 };
 
 } // namespace codal

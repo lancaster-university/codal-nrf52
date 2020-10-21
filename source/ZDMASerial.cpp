@@ -150,9 +150,10 @@ ZDMASerial::ZDMASerial(Pin &tx, Pin &rx, uint16_t id) : DMASerial(tx, rx, id)
     status |= DEVICE_COMPONENT_RUNNING;
 }
 
-int ZDMASerial::sendDMA(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
+int ZDMASerial::startSend(const uint8_t *data, int len, DMASerialCallback doneHandler,
+                          void *doneArg)
 {
-    int r = DMASerial::receiveDMA(data, len, doneHandler, doneArg);
+    int r = DMASerial::startSend(data, len, doneHandler, doneArg);
     if (r)
         return r;
 
@@ -166,9 +167,9 @@ int ZDMASerial::sendDMA(uint8_t *data, int len, DMASerialCallback doneHandler, v
     return DEVICE_OK;
 }
 
-int ZDMASerial::receiveDMA(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
+int ZDMASerial::startReceive(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
 {
-    int r = DMASerial::receiveDMA(data, len, doneHandler, doneArg);
+    int r = DMASerial::startReceive(data, len, doneHandler, doneArg);
     if (r)
         return r;
 
