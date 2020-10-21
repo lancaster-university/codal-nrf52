@@ -15,13 +15,13 @@ typedef void (*DMASerialCallback)(void *);
 class DMASerial : public CodalComponent
 {
 protected:
-    DMASerialCallback *txHandler, *rxHandler;
+    DMASerialCallback txHandler, rxHandler;
     void *txArg, *rxArg;
 
 public:
     Pin &tx, &rx;
 
-    SingleWireSerial(Pin &tx, Pin &rx, uint16_t id = DEVICE_ID_DMA_SERIAL) : tx(tx), rx(rx)
+    DMASerial(Pin &tx, Pin &rx, uint16_t id = DEVICE_ID_DMA_SERIAL) : tx(tx), rx(rx)
     {
         this->id = id;
         this->txHandler = this->rxHandler = NULL;

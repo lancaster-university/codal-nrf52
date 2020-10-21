@@ -3,6 +3,7 @@
 #include "core_cm4.h"
 #include "CodalDmesg.h"
 #include "peripheral_alloc.h"
+#include "codal_target_hal.h"
 
 using namespace codal;
 
@@ -17,7 +18,6 @@ void ZDMASerial::irq_handler(void *inst)
 
 void ZDMASerial::irq_handler()
 {
-    int eventValue = 0;
     if (uart->EVENTS_ENDRX)
     {
         uart->EVENTS_ENDRX = 0;
@@ -152,7 +152,7 @@ ZDMASerial::ZDMASerial(Pin &tx, Pin &rx, uint16_t id) : DMASerial(tx, rx, id)
 
 int ZDMASerial::sendDMA(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
 {
-    int r = DMASerial::receiveDMA(data, len, doneHandlerArg, doneArg);
+    int r = DMASerial::receiveDMA(data, len, doneHandler, doneArg);
     if (r)
         return r;
 
@@ -168,7 +168,7 @@ int ZDMASerial::sendDMA(uint8_t *data, int len, DMASerialCallback doneHandler, v
 
 int ZDMASerial::receiveDMA(uint8_t *data, int len, DMASerialCallback doneHandler, void *doneArg)
 {
-    int r = DMASerial::receiveDMA(data, len, doneHandlerArg, doneArg);
+    int r = DMASerial::receiveDMA(data, len, doneHandler, doneArg);
     if (r)
         return r;
 
