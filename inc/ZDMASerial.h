@@ -22,8 +22,7 @@ public:
 
     virtual int setBaud(uint32_t baud) override;
     virtual uint32_t getBaud() override;
-    virtual int enableTx(bool) override;
-    virtual int enableRx(bool) override;
+    virtual int enableTxRx(bool tx, bool rx) override;
     virtual int startSend(const uint8_t *data, int len, DMASerialCallback doneHandler,
                           void *doneArg) override;
     virtual int startReceive(uint8_t *data, int len, DMASerialCallback doneHandler,

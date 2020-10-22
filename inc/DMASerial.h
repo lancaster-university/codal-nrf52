@@ -29,8 +29,7 @@ public:
 
     virtual int setBaud(uint32_t baud) = 0;
     virtual uint32_t getBaud() = 0;
-    virtual int enableTx(bool) = 0;
-    virtual int enableRx(bool) = 0;
+    virtual int enableTxRx(bool tx, bool rx) = 0;
 
     virtual int startSend(const uint8_t *data, int len, DMASerialCallback doneHandler,
                           void *doneArg)
@@ -41,9 +40,6 @@ public:
             return DEVICE_BUSY;
         txHandler = doneHandler;
         txArg = doneArg;
-        if (&tx == &rx)
-            enableRx(false);
-        enableTx(true);
         return DEVICE_OK;
     }
 
@@ -55,9 +51,6 @@ public:
             return DEVICE_BUSY;
         rxHandler = doneHandler;
         rxArg = doneArg;
-        if (&tx == &rx)
-            enableTx(false);
-        enableRx(true);
         return DEVICE_OK;
     }
 

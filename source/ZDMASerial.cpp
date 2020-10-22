@@ -62,38 +62,40 @@ void ZDMASerial::stopTX()
     f(this->txArg);
 }
 
-int ZDMASerial::enableTx(bool enable)
+int ZDMASerial::enableTxRx(bool txEn, bool rxEn)
 {
-    if (enable && !(status & TX_CONFIGURED))
+    int st = 0;
+    if (txEn)
+        st |= TX_CONFIGURED;
+    if (rxEn)
+        st |= RX_CONFIGURED;
+
+    if ((st & status) == st)
+        return DEVICE_OK;
+
+    uart->TASKS_STOPTX = 1;
+    while (uart->TASKS_STOPTX)
+        ;
+    uart->TASKS_STOPRX = 1;
+    while (uart->TASKS_STOPRX)
+        ;
+    uart->ENABLE = 0;
+    while ((uart->ENABLE))
+        ;
+
+    if (txEn)
     {
         NRF_P0->DIR |= (1 << tx.name);
         NRF_P0->PIN_CNF[tx.name] = 3 << 2; // this overrides DIR setting above
         uart->PSEL.TXD = tx.name;
         uart->EVENTS_ENDTX = 0;
-        uart->ENABLE = 8;
-        while (!(uart->ENABLE))
-            ;
-        status |= TX_CONFIGURED;
     }
-    else if (status & TX_CONFIGURED)
+    else
     {
-        uart->TASKS_STOPTX = 1;
-        while (uart->TASKS_STOPTX)
-            ;
-        uart->ENABLE = 0;
-        while ((uart->ENABLE))
-            ;
-
         uart->PSEL.TXD = 0xFFFFFFFF;
-        status &= ~TX_CONFIGURED;
     }
 
-    return DEVICE_OK;
-}
-
-int ZDMASerial::enableRx(bool enable)
-{
-    if (enable && !(status & RX_CONFIGURED))
+    if (rxEn)
     {
         NRF_P0->DIR &= ~(1 << rx.name);
         NRF_P0->PIN_CNF[rx.name] = 3 << 2; // this overrides DIR setting above
@@ -101,22 +103,17 @@ int ZDMASerial::enableRx(bool enable)
         uart->EVENTS_ENDRX = 0;
         uart->EVENTS_ERROR = 0;
         uart->ERRORSRC = uart->ERRORSRC;
-        uart->ENABLE = 8;
-        while (!(uart->ENABLE))
-            ;
-        status |= RX_CONFIGURED;
     }
-    else if (enable == 0 && status & RX_CONFIGURED)
+    else
     {
-        uart->TASKS_STOPRX = 1;
-        while (uart->TASKS_STOPRX)
-            ;
-        uart->ENABLE = 0;
-        while ((uart->ENABLE))
-            ;
         uart->PSEL.RXD = 0xFFFFFFFF;
-        status &= ~RX_CONFIGURED;
     }
+
+    uart->ENABLE = 8;
+    while (!(uart->ENABLE))
+        ;
+
+    status = (status & ~(TX_CONFIGURED | RX_CONFIGURED)) | st;
 
     return DEVICE_OK;
 }
