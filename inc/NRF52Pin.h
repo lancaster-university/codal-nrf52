@@ -52,11 +52,6 @@ DEALINGS IN THE SOFTWARE.
   */
 namespace codal
 {
-    struct PinTimeStruct
-    {
-        CODAL_TIMESTAMP last_time;
-    };
-
     enum class TouchMode : uint8_t
     {
         Resistive = 0,

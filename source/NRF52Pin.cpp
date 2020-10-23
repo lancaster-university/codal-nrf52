@@ -177,9 +177,6 @@ void NRF52Pin::disconnect()
         // disconnect pin cng
         PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
         interrupt_enable &= ~(1 << this->name);
-
-        // if (obj)
-        //     delete ((PinTimeStruct*)obj);
     }
 
     // Reset status flags to zero, but retain preferred TouchSense mode.
@@ -694,16 +691,18 @@ int NRF52Pin::setPull(PullMode pull)
 void NRF52Pin::pulseWidthEvent(uint16_t eventValue)
 {
     Event evt(id, eventValue, CREATE_ONLY);
-    uint64_t now = evt.timestamp;
-    uint64_t previous = ((PinTimeStruct *)obj)->last_time;
 
-    if (previous != 0)
+    // we will overflow for pulses longer than 2^32us (over 1h)
+    uint32_t now = (uint32_t)evt.timestamp;
+
+    if (obj)
     {
-        evt.timestamp -= previous;
+        uint32_t diff = now - (uint32_t)obj;
+        evt.timestamp = diff;
         evt.fire();
     }
 
-    ((PinTimeStruct *)obj)->last_time = now;
+    obj = (void*)now;
 }
 
 void NRF52Pin::rise()
@@ -746,10 +745,7 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     {
         int v = getDigitalValue(pullMode);
 
-        if (!this->obj)
-            this->obj = new PinTimeStruct;
-
-        ((PinTimeStruct*)obj)->last_time = 0;
+        this->obj = 0;
 
         // PORT->DETECTMODE = 1; // latched-detect
 
