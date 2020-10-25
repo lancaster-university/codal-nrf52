@@ -584,7 +584,7 @@ int NRF52Pin::setServoPulseUs(uint32_t pulseWidth)
     if (pwm->getPeriodUs() != 20000)
         pwm->setPeriodUs(20000);
  
-    return setAnalogPeriodUs(pulseWidth);
+    return setAnalogValue((int) (1024.0f * (float) pulseWidth / 20000.0f));
 }
 
 /**
