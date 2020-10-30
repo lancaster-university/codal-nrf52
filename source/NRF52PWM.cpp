@@ -323,6 +323,7 @@ NRF52PWM::connectPin(Pin &pin, int channel)
     pin.disconnect();
     pin.setDigitalValue(0);
     PWM.PSEL.OUT[channel] = pin.name;
+    pin.disconnect();
 
     pin.status |= IO_STATUS_ANALOG_OUT;
     return DEVICE_OK;
