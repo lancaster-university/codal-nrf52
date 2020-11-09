@@ -15,7 +15,7 @@ extern int8_t target_get_irq_disabled();
  *
  **/
 NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
- : Serial(tx, rx), is_tx_in_progress_(false), p_uarte_(NULL)
+ : Serial(tx, rx), is_tx_in_progress_(false), dmaEnd(0), bytesProcessed(0), p_uarte_(NULL)
 {
     if(device != NULL)
         p_uarte_ = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
@@ -45,7 +45,10 @@ NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device)
     nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ERROR);
     nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXTO);
     nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
+    nrf_uarte_shorts_enable(p_uarte_, NRF_UARTE_SHORT_ENDRX_STARTRX);
+
     nrf_uarte_int_enable(p_uarte_,  NRF_UARTE_INT_RXDRDY_MASK|
+                                    NRF_UARTE_INT_RXSTARTED_MASK |
                                     NRF_UARTE_INT_ENDRX_MASK |
                                     NRF_UARTE_INT_ENDTX_MASK |
                                     NRF_UARTE_INT_ERROR_MASK |
@@ -93,7 +96,7 @@ void NRF52Serial::_irqHandler(void *self_)
     NRF52Serial *self = (NRF52Serial *)self_;
     NRF_UARTE_Type *p_uarte = self->p_uarte_;
 
-    if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXDRDY)){
+    while (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXDRDY)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_RXDRDY);
         self->dataReceivedDMA();
     }
@@ -101,14 +104,18 @@ void NRF52Serial::_irqHandler(void *self_)
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDRX)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDRX);
         self->updateRxBufferAfterENDRX();
-        nrf_uarte_task_trigger(p_uarte, NRF_UARTE_TASK_STARTRX);
+    }
+
+    if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXSTARTED)){
+        nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_RXSTARTED);
+        self->updateRxBufferAfterRXSTARTED();
+
     }else if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ERROR)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ERROR);
         (void) nrf_uarte_errorsrc_get_and_clear(p_uarte);
         // RX transaction abort
         nrf_uarte_task_trigger(p_uarte, NRF_UARTE_TASK_STOPRX);
         self->updateRxBufferAfterENDRX();
-        nrf_uarte_task_trigger(p_uarte, NRF_UARTE_TASK_STARTRX);        
     }
 
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXTO)){
@@ -146,7 +153,8 @@ int NRF52Serial::enableInterrupt(SerialInterruptType t)
         if(!(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT))
             initialiseRx();
         if(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT){
-            nrf_uarte_rx_buffer_set(p_uarte_, rxBuff, rxBuffSize);
+            dmaEnd = rxBuffSize/2;
+            nrf_uarte_rx_buffer_set(p_uarte_, rxBuff, dmaEnd);
             nrf_uarte_int_enable(p_uarte_, NRF_UARTE_INT_ERROR_MASK |
                                             NRF_UARTE_INT_ENDRX_MASK);
             nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STARTRX);
@@ -262,6 +270,8 @@ void NRF52Serial::dataReceivedDMA()
     if(!(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT))
         return;
 
+    bytesProcessed++;
+
     int delimeterOffset = 0;
     int delimLength = this->delimeters.length();
 
@@ -298,19 +308,31 @@ void NRF52Serial::dataReceivedDMA()
         Event(this->id, CODAL_SERIAL_EVT_RX_FULL);    
 }
 
-
 void NRF52Serial::updateRxBufferAfterENDRX()
 {
-    static uint8_t rx_dummy_byte_;
+    int rxBytes = nrf_uarte_rx_amount_get(p_uarte_);
+    int rx_cnt = rxBytes - bytesProcessed;
 
-    int rx_buffered_size = rxBufferedSize();
-    if(rx_buffered_size == 0){
-        nrf_uarte_rx_buffer_set(p_uarte_, rxBuff, rxBuffSize);
-    }else if(rxBuffSize > rx_buffered_size+1){
-        nrf_uarte_rx_buffer_set(p_uarte_, &rxBuff[rxBuffHead],
-            rxBuffSize-rxBuffHead);
-    }else if(rxBuffSize == rx_buffered_size+1){ // rxBuff is full.
-        // Set receive buffer using dummy byte buffer to keep DMA active.
-        nrf_uarte_rx_buffer_set(p_uarte_, &rx_dummy_byte_, 1);
+    // If we've dropped any interrupts, recover by processing and missed characters.
+    while(rx_cnt--)
+        dataReceivedDMA();
+
+    bytesProcessed = 0;
+}
+
+void NRF52Serial::updateRxBufferAfterRXSTARTED()
+{
+    int dmaStart;
+
+    // Apply double buffering
+    if (dmaEnd < rxBuffSize)
+    {
+        dmaStart = dmaEnd;
+        dmaEnd = rxBuffSize;
+    }else{
+        dmaStart = 0;
+        dmaEnd = rxBuffSize/2;
     }
+
+    nrf_uarte_rx_buffer_set(p_uarte_, &rxBuff[dmaStart], dmaEnd - dmaStart);
 }

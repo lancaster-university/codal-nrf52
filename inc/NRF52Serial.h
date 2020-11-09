@@ -12,20 +12,30 @@ namespace codal
 {
     class NRF52Serial : public Serial
     {
-        bool is_tx_in_progress_;
+        volatile bool is_tx_in_progress_;
+        volatile int  dmaEnd;
+        volatile int  bytesProcessed;
 
         NRF_UARTE_Type *p_uarte_;
         static void _irqHandler(void *self);
 
         /**
-          * Update DMA RX buffer pointer through ring buffer management.
-          * 
-          * UARTE generates an event called ENDRX when the specified buffer is full.
-          * It is necessary to command STARTRX again after clearing the ENDRX event.
-          * This function is to set the start address and size of the ring buffer 
-          * that can be received in consideration of the data unread by the user in the ring buffer.
-        **/
+         * Ensures all characters have been processed once a DMA buffer is fully received.
+         *
+         * This function is called upon an ENDRX hardware event, which is raised when a RX DMA buffer
+         * has been filled. Normally there is nothing to do, but in the eventuality that an interrupt has been
+         * missed (typically due to CPU contention), this function ensures the codal Serial ringbuffer is synchronised
+         * and no characters are lost.
+         */
         void updateRxBufferAfterENDRX();
+
+        /**
+          * Update DMA RX buffer pointer.
+          * 
+          * UARTE generates an RXSTARTED event once the DMA buffer geometry has been read.
+          * This function implements a DMA enabled double buffer within the codal Serial ringbuffer.
+        **/
+        void updateRxBufferAfterRXSTARTED();
 
         /**
           * DMA version of Serial::dataReceviced()
