@@ -64,7 +64,6 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     {
         nrf52_pwm_driver[0] = this;
         NVIC_SetVector( PWM0_IRQn, (uint32_t) nrf52_pwm0_irq );
-        NVIC_SetPriority(PWM0_IRQn, 0);
         NVIC_ClearPendingIRQ(PWM0_IRQn);
         NVIC_EnableIRQ(PWM0_IRQn);
     }
@@ -73,7 +72,6 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     {
         nrf52_pwm_driver[1] = this;
         NVIC_SetVector( PWM1_IRQn, (uint32_t) nrf52_pwm1_irq );
-        NVIC_SetPriority(PWM1_IRQn, 0);
         NVIC_ClearPendingIRQ(PWM1_IRQn);
         NVIC_EnableIRQ(PWM1_IRQn);
     }
@@ -82,7 +80,6 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     {
         nrf52_pwm_driver[2] = this;
         NVIC_SetVector( PWM2_IRQn, (uint32_t) nrf52_pwm2_irq );
-        NVIC_SetPriority(PWM2_IRQn, 0);
         NVIC_ClearPendingIRQ(PWM2_IRQn);
         NVIC_EnableIRQ(PWM2_IRQn);
     }
