@@ -122,15 +122,9 @@ NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pi
     this->pullMode = DEVICE_DEFAULT_PULLMODE;
     CODAL_ASSERT(name < NUM_PINS, 50);
     irq_pins[name] = this;
-
-    // Power up in a disconnected, low power state.
-    // If we're unused, this is how it will stay...
-    this->status = 0x00;
-
     this->obj = NULL;
 
     NRF_GPIOTE->INTENSET    = GPIOTE_INTENSET_PORT_Set << GPIOTE_INTENSET_PORT_Pos;
-    NVIC_SetPriority(GPIOTE_IRQn, 1);
     NVIC_EnableIRQ  (GPIOTE_IRQn);
 }
 
@@ -179,9 +173,9 @@ void NRF52Pin::disconnect()
         interrupt_enable &= ~(1 << this->name);
     }
 
-    // Reset status flags to zero, but retain preferred TouchSense mode.
+    // Reset status flags to zero, but retain preferred TouchSense and Polarity mode.
     obj = NULL;
-    status &= IO_STATUS_CAPACITATIVE_TOUCH;
+    status &= (IO_STATUS_CAPACITATIVE_TOUCH | IO_STATUS_ACTIVE_HI);
 }
 
 /**
