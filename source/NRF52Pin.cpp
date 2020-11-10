@@ -29,6 +29,7 @@ DEALINGS IN THE SOFTWARE.
   */
 #include "NRF52Pin.h"
 #include "Button.h"
+#include "PulseIn.h"
 #include "Timer.h"
 #include "ErrorNo.h"
 #include "nrf.h"
@@ -165,6 +166,9 @@ void NRF52Pin::disconnect()
                 delete ((Button*)obj);
         }
     }
+
+    if (status & IO_STATUS_EVENT_PULSE_ON_EDGE)
+        delete ((PulseIn *)obj);
 
     if (status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE))
     {
@@ -689,14 +693,16 @@ void NRF52Pin::pulseWidthEvent(uint16_t eventValue)
     // we will overflow for pulses longer than 2^32us (over 1h)
     uint32_t now = (uint32_t)evt.timestamp;
 
-    if (obj)
+    PulseIn *p = (PulseIn *)obj;
+
+    if (p)
     {
-        uint32_t diff = now - (uint32_t)obj;
+        uint32_t diff = now - p->lastEdge;
+        p->lastEdge = now;
+
         evt.timestamp = diff;
         evt.fire();
     }
-
-    obj = (void*)now;
 }
 
 void NRF52Pin::rise()
@@ -738,8 +744,6 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
     {
         int v = getDigitalValue(pullMode);
-
-        this->obj = 0;
 
         // PORT->DETECTMODE = 1; // latched-detect
 
@@ -834,6 +838,30 @@ int NRF52Pin::eventOn(int eventType)
     }
 
     return DEVICE_OK;
+}
+
+/**
+ * Measures the period of the next digital pulse on this pin.
+ * The polarity of the detected pulse is defined by setPolarity().
+ * The calling fiber is blocked until a pulse is received or the specified
+ * timeout passes.
+ *
+ * @param timeout The maximum period of time in microseconds to wait for a pulse.
+ * @return the period of the pulse in microseconds, or DEVICE_CANCELLED on timeout.
+ */
+int
+NRF52Pin::getPulseUs(int timeout)
+{
+    PulseIn *p;
+
+    if (!(status & IO_STATUS_EVENT_PULSE_ON_EDGE))
+    {
+        p = new PulseIn(*this);
+        obj = (void *)p;
+    }
+
+    p = (PulseIn *)obj;
+    return p->awaitPulse(timeout);
 }
 
 /**

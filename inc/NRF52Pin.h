@@ -388,6 +388,19 @@ namespace codal
              */
         virtual int eventOn(int eventType) override;
 
+
+        /**
+         * Measures the period of the next digital pulse on this pin.
+         * The polarity of the detected pulse is defined by setPolarity().
+         * The calling fiber is blocked until a pulse is received or the specified
+         * timeout passes.
+         *
+         * @param timeout The maximum period of time in microseconds to wait for a pulse.
+         * @return the period of the pulse in microseconds, or DEVICE_CANCELLED on timeout.
+         */
+        virtual int getPulseUs(int timeout) override;
+
+
         /**
          * Configures this IO pin as a high drive pin (capable of sourcing/sinking greater current).
          * By default, pins are STANDARD drive.
