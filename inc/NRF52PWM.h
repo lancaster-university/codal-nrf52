@@ -26,10 +26,12 @@ private:
     bool            enabled;                // Determines if this PWM instance is enabled
     bool            active;                 // Determines if this PWM instance is actively generating output
     bool            streaming;              // Determines if the output is streamed, or discrete. Streamed mode maintains ordered, discrete repeats playout most recent data provided.
+    bool            repeatOnEmpty;          // Determines the behaviour of the PWM if a buffer underflow occurs.
     int             dataReady;              // Count of the number of input buffers awaiting playout
     int             sampleRate;
     int             periodUs;               // Period between output samples, in microseconds
     uint8_t         bufferPlaying;          // ID of the buffer currently being played (0 or 1). Output is hardware double buffered.
+    int8_t          stopStreamingAfterBuf;  // When stopping, the last buffer ID to play beforhand. -1 if no stop is scheduled.
     ManagedBuffer   buffer[2];              // The ManagedBuffers currently being used by the PWN hardware
 
 public:
@@ -107,8 +109,9 @@ public:
      * Defines if the PWM module should maintain playout ordering of buffers, or always play the most recent buffer provided.
      * 
      * @ param streamingMode If true, buffers will be streamed in order they are received. If false, the most recent buffer supplied always takes prescedence.
+     * @ param repeatOnEmpty If set to true, the last buffer received will be repeated when no data is available. If false, the PWM channel will be suspended.
      */
-    void setStreamingMode(bool streamingMode);
+    void setStreamingMode(bool streamingMode, bool repeatOnEmpty = true);
 
     /**
      * Interrupt callback when playback of DMA buffer has completed

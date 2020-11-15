@@ -1,7 +1,6 @@
 #include "NRF52PWM.h"
 #include "nrf.h"
 #include "cmsis.h"
-#include "CodalDmesg.h"
 
 void nrf52_pwm0_irq(void)
 {
@@ -34,7 +33,9 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     this->dataReady = 0;
     this->active = false;
     this->streaming = true;
+    this->repeatOnEmpty = true;
     this->bufferPlaying = 0;
+    this->stopStreamingAfterBuf = -1;
 
     // Ensure PWM is currently disabled.
     disable();
@@ -134,10 +135,7 @@ int NRF52PWM::setPeriodUs(int period)
 
     // If the sample rate requested is outside the range of what the hardware can achieve, then there's nothign we can do.
     if (prescaler > 7)
-    {
-        DMESG("NRF52PWM: Invalid samplerate");
         return DEVICE_INVALID_PARAMETER;
-    }
 
     // Decrement prescaler, as hardware indexes from zero.
     PWM.PRESCALER = prescaler;
@@ -188,10 +186,12 @@ int NRF52PWM::setDecoderMode(uint32_t mode)
  * Defines if the PWM module should maintain playout ordering of buffers, or always play the most recent buffer provided.
  * 
  * @ param streamingMode If true, buffers will be streamed in order they are received. If false, the most recent buffer supplied always takes prescedence.
+ * @ param repeatOnEmpty If set to true, the last buffer received will be repeated when no data is available. If false, the PWM channel will be suspended.
  */
-void NRF52PWM::setStreamingMode(bool streamingMode)
+void NRF52PWM::setStreamingMode(bool streamingMode, bool repeatOnEmpty)
 {
     this->streaming = streamingMode;
+    this->repeatOnEmpty = repeatOnEmpty;
 
     if (streaming)
     {
@@ -214,6 +214,14 @@ void NRF52PWM::setStreamingMode(bool streamingMode)
  */
 int NRF52PWM::tryPull(uint8_t b)
 {
+    if (stopStreamingAfterBuf == b)
+    {
+        PWM.TASKS_STOP = 1;
+        active = false;
+        stopStreamingAfterBuf = -1;
+        return 0;
+    }
+
     if (dataReady){
         buffer[b] = upstream.pull();
         PWM.SEQ[b].PTR = (uint32_t) buffer[b].getBytes();
@@ -224,6 +232,12 @@ int NRF52PWM::tryPull(uint8_t b)
         return 1;
     }
 
+    // If we're in active streaming mode, and have requested a buffer and failed to get one, we have an underflow.
+    // Streaming mode is double buffered, so schedule ourself to stop after the next buffer is played, if we're so configured.
+    if (streaming && active && !repeatOnEmpty)
+    {
+        stopStreamingAfterBuf = (b == 0) ? 1 : 0;
+    }
     return 0;
 }
 
@@ -237,8 +251,9 @@ int NRF52PWM::pullRequest()
     // If we're not running in streaming mode, simply pull the requested buffer and schedule for DMA.
     if (!streaming)
     {
-        tryPull(0);
-        PWM.TASKS_SEQSTART[0] = 1;
+        int result = tryPull(0);
+        if (result || repeatOnEmpty)
+            PWM.TASKS_SEQSTART[0] = 1;
     }
 
     // If we're in streaming mode, ensure that we've preloaded both double buffers before initiating playout.
