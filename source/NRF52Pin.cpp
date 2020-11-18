@@ -77,7 +77,7 @@ void GPIOTE_IRQHandler(void)
             {
                 uint32_t currCnf = NRF_P0->PIN_CNF[i];
                 uint8_t currSense = (currCnf & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos;
-                
+
                 // hi: latch indicates a state change... determine if we were looking for hi or lo.
                 if (currSense == GPIO_PIN_CNF_SENSE_High)
                 {
@@ -95,7 +95,9 @@ void GPIOTE_IRQHandler(void)
         }
         // make sure to clear everything
         NRF_P0->LATCH = 0xffffffff;
+#ifdef NRF_P1
         NRF_P1->LATCH = 0xffffffff;
+#endif
     }
 }
 
@@ -145,7 +147,7 @@ void NRF52Pin::disconnect()
         {
             if (NRF52PWM::nrf52_pwm_driver[p])
             {
-                NRF52PWM::nrf52_pwm_driver[p]->disconnectPin(*this);    
+                NRF52PWM::nrf52_pwm_driver[p]->disconnectPin(*this);
 
                 // If this pin was attaced to the analog funcitons in this class, clear any cached state.
                 if ( NRF52PWM::nrf52_pwm_driver[p] == pwm)
@@ -201,7 +203,7 @@ int NRF52Pin::setDigitalValue(int value)
     if(!(PIN_CAPABILITY_DIGITAL & capability))
         return DEVICE_NOT_SUPPORTED;
 
-    // Write the value, before setting as output - this way the pin state update will be atomic    
+    // Write the value, before setting as output - this way the pin state update will be atomic
     if (value)
         PORT->OUTSET = 1 << PIN;
     else
@@ -214,7 +216,7 @@ int NRF52Pin::setDigitalValue(int value)
         disconnect();
 
         uint32_t cnf = PORT->PIN_CNF[PIN];
-        
+
         // output
         cnf |= 1;
 
@@ -315,7 +317,7 @@ int NRF52Pin::setAnalogValue(int value)
     // //check if this pin has an analogue mode...
      if(!(PIN_CAPABILITY_ANALOG & capability))
          return DEVICE_NOT_SUPPORTED;
-    
+
     // //sanitise the level value
     if(value < 0 || value > DEVICE_PIN_MAX_OUTPUT)
          return DEVICE_INVALID_PARAMETER;
@@ -518,7 +520,7 @@ int NRF52Pin::isTouched()
   * @endcode
   */
 int NRF52Pin::isTouched(TouchMode touchMode)
-{  
+{
     //check if this pin has a touch mode...
     if(!(PIN_CAPABILITY_DIGITAL & capability))
         return DEVICE_NOT_SUPPORTED;
@@ -581,7 +583,7 @@ int NRF52Pin::setServoPulseUs(uint32_t pulseWidth)
 
     if (pwm->getPeriodUs() != 20000)
         pwm->setPeriodUs(20000);
- 
+
     return setAnalogValue((int) (1024.0f * (float) pulseWidth / 20000.0f));
 }
 
@@ -604,7 +606,7 @@ int NRF52Pin::setAnalogPeriodUs(uint32_t period)
             float v = (float) pwmBuffer[i];
             v = v * (float)pwm->getSampleRange();
             v = v / (float) oldRange;
-             
+
             pwmBuffer[i] = (uint16_t) v;
         }
 
@@ -612,7 +614,7 @@ int NRF52Pin::setAnalogPeriodUs(uint32_t period)
 
         return DEVICE_OK;
     }
-    
+
     return DEVICE_NOT_SUPPORTED;
 }
 
@@ -940,7 +942,7 @@ int NRF52Pin::getAndSetDigitalValue(int value)
 
 /**
  * Configures the Enables/Disables this pin's DETECT event
- * @param enable The new value of this pin's DETECT sense configuration 
+ * @param enable The new value of this pin's DETECT sense configuration
  * Valid values are GPIO_PIN_CNF_SENSE_Disabled, GPIO_PIN_CNF_SENSE_High, GPIO_PIN_CNF_SENSE_Low
  */
 void NRF52Pin::setDetect(int enable)
