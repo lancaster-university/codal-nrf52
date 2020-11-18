@@ -31,7 +31,11 @@ __attribute__((noinline)) void neopixel_send_buffer(Pin &pin, const uint8_t *ptr
 {
     pin.setDigitalValue(0);
 
+#ifdef NRF_P1
     auto port = pin.name < 32 ? NRF_P0 : NRF_P1;
+#else
+    auto port = NRF_P0;
+#endif
     uint32_t PIN = 1 << (pin.name & 31);
 
     if (!(DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk))
