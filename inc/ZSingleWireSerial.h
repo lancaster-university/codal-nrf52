@@ -4,8 +4,8 @@
 #include "Pin.h"
 #include "CodalComponent.h"
 #include "CodalConfig.h"
-#include "SingleWireSerial.h"
-#include "JACDAC.h"
+#include "DMASingleWireSerial.h"
+#include "codal_target_hal.h"
 #include "MemberFunctionCallback.h"
 #include "nrf.h"
 
