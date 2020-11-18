@@ -79,7 +79,9 @@ extern "C" void target_start()
     // bring ports back to reset state, in case bootloader messed it up
     for (int i = 0; i < 32; ++i) {
         NRF_P0->PIN_CNF[i] = 2;
+#ifdef NRF_P1
         NRF_P1->PIN_CNF[i] = 2;
+#endif
     }
     user_init();
     _start();
