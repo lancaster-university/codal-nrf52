@@ -2,6 +2,9 @@
 #include "nrf.h"
 #include "cmsis.h"
 
+#define  NRF52PWM_EMPTY_BUFFERSIZE  8
+static uint16_t emptyBuffer[NRF52PWM_EMPTY_BUFFERSIZE];
+
 void nrf52_pwm0_irq(void)
 {
     // Simply pass on to the driver component handler.
@@ -36,6 +39,10 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     this->repeatOnEmpty = true;
     this->bufferPlaying = 0;
     this->stopStreamingAfterBuf = -1;
+
+    // Clear empty buffer
+    for (int i=0; i<NRF52PWM_EMPTY_BUFFERSIZE; i++)
+        emptyBuffer[i] = 0x8000;
 
     // Ensure PWM is currently disabled.
     disable();
@@ -219,6 +226,7 @@ int NRF52PWM::tryPull(uint8_t b)
         PWM.TASKS_STOP = 1;
         active = false;
         stopStreamingAfterBuf = -1;
+        bufferPlaying = 0;
         return 0;
     }
 
@@ -236,6 +244,10 @@ int NRF52PWM::tryPull(uint8_t b)
     // Streaming mode is double buffered, so schedule ourself to stop after the next buffer is played, if we're so configured.
     if (streaming && active && !repeatOnEmpty)
     {
+        // The PWM doesn't seem to respond to changes in the SHORTS register while it's active...
+        // instead, we provide an empty buffer to prevent partial repetition of any previous buffer.
+        PWM.SEQ[b].PTR = (uint32_t) emptyBuffer;
+        PWM.SEQ[b].CNT = (uint32_t) NRF52PWM_EMPTY_BUFFERSIZE;
         stopStreamingAfterBuf = (b == 0) ? 1 : 0;
     }
     return 0;
@@ -331,6 +343,11 @@ NRF52PWM::connectPin(Pin &pin, int channel)
 {
     if (channel >= NRF52PWM_PWM_CHANNELS)
         return DEVICE_INVALID_PARAMETER;
+
+    // If the pin is already connected to the requested channel, we have nothing to do.
+    // We optimise this in order to prevent any possible glitch to an already connected channel...
+    if (PWM.PSEL.OUT[channel] == pin.name)
+        return DEVICE_OK;
 
     pin.disconnect();
     pin.setDigitalValue(0);
