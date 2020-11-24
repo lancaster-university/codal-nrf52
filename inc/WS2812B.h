@@ -35,7 +35,7 @@ DEALINGS IN THE SOFTWARE.
 #define WS2812B_LOW                 (0x8000 | 6)
 #define WS2812B_HIGH                (0x8000 | 10)
 #define WS2812B_PWM_FREQ            500000
-#define WS2812B_ZERO_PADDING        32
+#define WS2812B_ZERO_PADDING        50
 
 /**
  * A simple buffer class for encoding an streaming WS2812B (neopixel) data via a NRF52PWM peripheral
