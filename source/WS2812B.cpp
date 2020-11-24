@@ -84,7 +84,8 @@ WS2812B::setBufferSize(int size)
 ManagedBuffer WS2812B::pull()
 {
     // Calculate the amount of data we can transfer in this pull request.
-    int totalSamples = samplesToSend + 2 * WS2812B_ZERO_PADDING;
+    // Ensure we send at least two buffers, as most downstream components will likely be double buffered...
+    int totalSamples = max(outputBufferSize, samplesToSend + 2 * WS2812B_ZERO_PADDING);
     ManagedBuffer buffer(outputBufferSize);
 
     uint16_t *out = (uint16_t *) &buffer[0];
