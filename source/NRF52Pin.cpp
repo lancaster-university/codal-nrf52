@@ -742,6 +742,8 @@ void NRF52Pin::fall()
   */
 int NRF52Pin::enableRiseFallEvents(int eventType)
 {
+    bool enabled = false;
+
     // if we are in neither of the two modes, configure pin as a TimedInterruptIn.
     if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
     {
@@ -759,6 +761,7 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
 
         // configure as interrupt in
         interrupt_enable |= (1 << this->name);
+        enabled = true;
     }
 
     status &= ~(IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE);
@@ -770,6 +773,9 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
         status |= IO_STATUS_EVENT_PULSE_ON_EDGE;
     else if(eventType == DEVICE_PIN_INTERRUPT_ON_EDGE)
         status |= IO_STATUS_INTERRUPT_ON_EDGE;
+
+    if (enabled && eventType == DEVICE_PIN_EVENT_ON_PULSE)
+        obj = (void *) new PulseIn(*this);
 
     return DEVICE_OK;
 }
@@ -857,10 +863,7 @@ NRF52Pin::getPulseUs(int timeout)
     PulseIn *p;
 
     if (!(status & IO_STATUS_EVENT_PULSE_ON_EDGE))
-    {
-        p = new PulseIn(*this);
-        obj = (void *)p;
-    }
+        eventOn(DEVICE_PIN_EVENT_ON_PULSE);
 
     p = (PulseIn *)obj;
     return p->awaitPulse(timeout);
