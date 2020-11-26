@@ -149,11 +149,11 @@ void NRF52SPI::config()
         return;
     configured = 1;
 
-    sck.setDigitalValue(mode <= 1 ? 0 : 1);
     setDrive(&sck);
     setDrive(&mosi);
     uint32_t mosi_pin = 0xffffffff;
     uint32_t miso_pin = 0xffffffff;
+    uint32_t sck_pin = 0xffffffff;
     if (&mosi)
     {
         mosi.setDigitalValue(0);
@@ -164,9 +164,14 @@ void NRF52SPI::config()
         miso.getDigitalValue();
         miso_pin = miso.name;
     }
+    if (&sck)
+    {
+        sck.setDigitalValue(mode <= 1 ? 0 : 1);
+        sck_pin = sck.name;
+    }
 
     nrf_spim_disable(p_spim);
-    nrf_spim_pins_set(p_spim, sck.name, mosi_pin, miso_pin);
+    nrf_spim_pins_set(p_spim, sck_pin, mosi_pin, miso_pin);
     nrf_spim_frequency_set(p_spim, (nrf_spim_frequency_t)freq);
     nrf_spim_configure(p_spim, (nrf_spim_mode_t)mode, NRF_SPIM_BIT_ORDER_MSB_FIRST);
     nrf_spim_orc_set(p_spim, 0);
