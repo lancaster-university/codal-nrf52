@@ -191,7 +191,7 @@ void NRF52SPI::config()
  */
 int NRF52SPI::setFrequency(uint32_t frequency)
 {
-    configured = 0;
+    nrf_spim_frequency_t freq;
 
 #ifdef NRF_SPIM3
     if (p_spim == NRF_SPIM3 && frequency >= 32000000)
@@ -214,6 +214,13 @@ int NRF52SPI::setFrequency(uint32_t frequency)
         freq = NRF_SPIM_FREQ_250K;
     else
         freq = NRF_SPIM_FREQ_125K;
+
+    if (this->freq != freq)
+    {
+        configured = 0;
+        this->freq = freq;
+    }
+
     return DEVICE_OK;
 }
 
