@@ -775,7 +775,13 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
         status |= IO_STATUS_INTERRUPT_ON_EDGE;
 
     if (enabled && eventType == DEVICE_PIN_EVENT_ON_PULSE)
-        obj = (void *) new PulseIn(*this);
+    {
+        // Create a new object to track pulse timing data.
+        // Set the initial pulse edge to the current time in case the line is currently active.
+        PulseIn *p = new PulseIn(*this);
+        p->lastEdge = system_timer_current_time_us();
+        obj = (void *) p;
+    }
 
     return DEVICE_OK;
 }
