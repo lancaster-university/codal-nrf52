@@ -158,6 +158,15 @@ void NRF52Pin::disconnect()
         }
     }
 
+    if (adc && (status & IO_STATUS_ANALOG_IN))
+    {
+        NRF52ADCChannel *c = adc->getChannel(*this);
+
+        // Release the ADC channel, and wait for it to be fully disabled before continuing.
+        adc->releaseChannel(*this);
+        while(c->isEnabled());
+    }
+
     if (status & IO_STATUS_TOUCH_IN)
     {
         if (obj)
