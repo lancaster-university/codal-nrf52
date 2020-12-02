@@ -38,7 +38,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
     this->streaming = true;
     this->repeatOnEmpty = true;
     this->bufferPlaying = 0;
-    this->stopStreamingAfterBuf = -1;
+    this->stopStreamingAfterBuf = 0;
 
     // Clear empty buffer
     for (int i=0; i<NRF52PWM_EMPTY_BUFFERSIZE; i++)
@@ -221,12 +221,22 @@ void NRF52PWM::setStreamingMode(bool streamingMode, bool repeatOnEmpty)
  */
 int NRF52PWM::tryPull(uint8_t b)
 {
-    if (stopStreamingAfterBuf == b)
+    if (stopStreamingAfterBuf)
     {
         PWM.TASKS_STOP = 1;
+        while(PWM.EVENTS_STOPPED == 0);
+
         active = false;
-        stopStreamingAfterBuf = -1;
         bufferPlaying = 0;
+        stopStreamingAfterBuf = 0;
+
+        // If a Pull request has been made since we decided to stop, start to fill up the
+        // hardware double buffer so that we don't stall.
+        if(dataReady)
+        {
+            dataReady--;
+            pullRequest();
+        }
         return 0;
     }
 
@@ -248,7 +258,7 @@ int NRF52PWM::tryPull(uint8_t b)
         // instead, we provide an empty buffer to prevent partial repetition of any previous buffer.
         PWM.SEQ[b].PTR = (uint32_t) emptyBuffer;
         PWM.SEQ[b].CNT = (uint32_t) NRF52PWM_EMPTY_BUFFERSIZE;
-        stopStreamingAfterBuf = (b == 0) ? 1 : 0;
+        stopStreamingAfterBuf = 1;
     }
     return 0;
 }
