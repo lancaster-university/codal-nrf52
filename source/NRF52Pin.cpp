@@ -208,36 +208,34 @@ void NRF52Pin::disconnect()
   */
 int NRF52Pin::setDigitalValue(int value)
 {
-    // Check if this pin has a digital mode...
-    if(!(PIN_CAPABILITY_DIGITAL & capability))
-        return DEVICE_NOT_SUPPORTED;
+    if (status & IO_STATUS_DIGITAL_OUT)
+    {
+        if (value)
+            PORT->OUTSET = 1 << PIN;
+        else
+            PORT->OUTCLR = 1 << PIN;
 
-    // Write the value, before setting as output - this way the pin state update will be atomic
+        return DEVICE_OK;
+    }
+
+    // Optimisation: Permit fast changes between digital in and digital out, given its common use case.
+    // we also preserve any interrupt status, pulse measurement events etc.
+    if (status & IO_STATUS_DIGITAL_IN)
+    {
+        PORT->PIN_CNF[PIN] |= 2;
+        status &= ~IO_STATUS_DIGITAL_IN;
+    }
+    else
+        disconnect();
+
     if (value)
         PORT->OUTSET = 1 << PIN;
     else
         PORT->OUTCLR = 1 << PIN;
 
+    PORT->PIN_CNF[PIN] |= 1;
 
-    // Move into a Digital output state if necessary.
-    if (!(status & IO_STATUS_DIGITAL_OUT))
-    {
-        disconnect();
-
-        uint32_t cnf = PORT->PIN_CNF[PIN];
-
-        // output
-        cnf |= 1;
-
-        // high drive
-        // cnf |= (3 << 8);
-        // cnf &= ~(1 << 10);
-
-        PORT->PIN_CNF[PIN] = cnf;
-
-        // Record our mode, so we can optimise later.
-        status |= IO_STATUS_DIGITAL_OUT;
-    }
+    status |= IO_STATUS_DIGITAL_OUT;
 
     return DEVICE_OK;
 }
@@ -256,20 +254,21 @@ int NRF52Pin::setDigitalValue(int value)
   */
 int NRF52Pin::getDigitalValue()
 {
-    //check if this pin has a digital mode...
-    if(!(PIN_CAPABILITY_DIGITAL & capability))
-        return DEVICE_NOT_SUPPORTED;
+    // Optimisation: Permit fast changes between digital in and digital out, given its common use case.
+    // we also preserve any interrupt status, pulse measurement events etc.
+    if (status & IO_STATUS_DIGITAL_IN)
+        return (PORT->IN & (1 << PIN)) ? 1 : 0;
 
-    if (!(status & (IO_STATUS_DIGITAL_IN | IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
-    {
+    if (status & IO_STATUS_DIGITAL_OUT)
+        status &= ~IO_STATUS_DIGITAL_OUT;
+    else
         disconnect();
 
-        // Enable input mode, and input buffer
-        PORT->PIN_CNF[PIN] &= 0xfffffffc;
+    // Enable input mode, and input buffer
+    PORT->PIN_CNF[PIN] &= 0xfffffffc;
 
-        // Record our mode, so we can optimise later.
-        status |= IO_STATUS_DIGITAL_IN;
-    }
+    // Record our mode, so we can optimise later.
+    status |= IO_STATUS_DIGITAL_IN;
 
     // return the current state of the pin
     return (PORT->IN & (1 << PIN)) ? 1 : 0;
@@ -876,6 +875,9 @@ int
 NRF52Pin::getPulseUs(int timeout)
 {
     PulseIn *p;
+
+    // ensure we're in digital input mode.
+    getDigitalValue();
 
     if (!(status & IO_STATUS_EVENT_PULSE_ON_EDGE))
         eventOn(DEVICE_PIN_EVENT_ON_PULSE);
