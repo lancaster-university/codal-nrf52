@@ -8,13 +8,17 @@
 #include "Serial.h"
 #include "hal/nrf_uarte.h"
 
+#ifndef CONFIG_SERIAL_DMA_BUFFER_SIZE
+#define CONFIG_SERIAL_DMA_BUFFER_SIZE   32
+#endif
+
 namespace codal
 {
     class NRF52Serial : public Serial
     {
         volatile bool is_tx_in_progress_;
-        volatile int  dmaEnd;
         volatile int  bytesProcessed;
+        uint8_t dmaBuffer[CONFIG_SERIAL_DMA_BUFFER_SIZE];
 
         NRF_UARTE_Type *p_uarte_;
         static void _irqHandler(void *self);

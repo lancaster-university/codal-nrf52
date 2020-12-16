@@ -15,7 +15,7 @@ extern int8_t target_get_irq_disabled();
  *
  **/
 NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
- : Serial(tx, rx), is_tx_in_progress_(false), dmaEnd(0), bytesProcessed(0), p_uarte_(NULL)
+ : Serial(tx, rx), is_tx_in_progress_(false), bytesProcessed(0), p_uarte_(NULL)
 {
     if(device != NULL)
         p_uarte_ = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
@@ -45,6 +45,7 @@ NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device)
     nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ERROR);
     nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXTO);
     nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
+    nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXSTARTED);
     nrf_uarte_shorts_enable(p_uarte_, NRF_UARTE_SHORT_ENDRX_STARTRX);
 
     nrf_uarte_int_enable(p_uarte_,  NRF_UARTE_INT_RXDRDY_MASK|
@@ -112,10 +113,7 @@ void NRF52Serial::_irqHandler(void *self_)
 
     }else if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ERROR)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ERROR);
-        (void) nrf_uarte_errorsrc_get_and_clear(p_uarte);
-        // RX transaction abort
-        nrf_uarte_task_trigger(p_uarte, NRF_UARTE_TASK_STOPRX);
-        self->updateRxBufferAfterENDRX();
+        nrf_uarte_errorsrc_get_and_clear(p_uarte);
     }
 
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXTO)){
@@ -152,9 +150,9 @@ int NRF52Serial::enableInterrupt(SerialInterruptType t)
     if (t == RxInterrupt){
         if(!(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT))
             initialiseRx();
+
         if(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT){
-            dmaEnd = rxBuffSize/2;
-            nrf_uarte_rx_buffer_set(p_uarte_, rxBuff, dmaEnd);
+            nrf_uarte_rx_buffer_set(p_uarte_, dmaBuffer, CONFIG_SERIAL_DMA_BUFFER_SIZE);
             nrf_uarte_int_enable(p_uarte_, NRF_UARTE_INT_ERROR_MASK |
                                             NRF_UARTE_INT_ENDRX_MASK);
             nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STARTRX);
@@ -267,45 +265,7 @@ int NRF52Serial::getc()
 
 void NRF52Serial::dataReceivedDMA()
 {
-    if(!(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT))
-        return;
-
-    bytesProcessed++;
-
-    int delimeterOffset = 0;
-    int delimLength = this->delimeters.length();
-
-    //iterate through our delimeters (if any) to see if there is a match
-    while(delimeterOffset < delimLength)
-    {
-        //fire an event if there is to block any waiting fibers
-        if(this->delimeters.charAt(delimeterOffset) == this->rxBuff[rxBuffHead])
-            Event(this->id, CODAL_SERIAL_EVT_DELIM_MATCH);
-
-        delimeterOffset++;
-    }
-
-    uint16_t newHead = (rxBuffHead + 1) % rxBuffSize;
-
-    //look ahead to our newHead value to see if we are about to collide with the tail
-    if(newHead != rxBuffTail)
-    {
-        //if we are not, update our actual head.
-        rxBuffHead = newHead;
-
-        //if we have any fibers waiting for a specific number of characters, unblock them
-        if(rxBuffHeadMatch >= 0)
-            if(rxBuffHead == rxBuffHeadMatch)
-            {
-                rxBuffHeadMatch = -1;
-                Event(this->id, CODAL_SERIAL_EVT_HEAD_MATCH);
-            }
-
-        status |= CODAL_SERIAL_STATUS_RXD;
-    }
-    else
-        //otherwise, our buffer is full, send an event to the user...
-        Event(this->id, CODAL_SERIAL_EVT_RX_FULL);    
+    dataReceived(dmaBuffer[bytesProcessed++]);
 }
 
 void NRF52Serial::updateRxBufferAfterENDRX()
@@ -322,17 +282,5 @@ void NRF52Serial::updateRxBufferAfterENDRX()
 
 void NRF52Serial::updateRxBufferAfterRXSTARTED()
 {
-    int dmaStart;
-
-    // Apply double buffering
-    if (dmaEnd < rxBuffSize)
-    {
-        dmaStart = dmaEnd;
-        dmaEnd = rxBuffSize;
-    }else{
-        dmaStart = 0;
-        dmaEnd = rxBuffSize/2;
-    }
-
-    nrf_uarte_rx_buffer_set(p_uarte_, &rxBuff[dmaStart], dmaEnd - dmaStart);
+    nrf_uarte_rx_buffer_set(p_uarte_, dmaBuffer, CONFIG_SERIAL_DMA_BUFFER_SIZE);
 }
