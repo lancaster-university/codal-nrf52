@@ -29,7 +29,7 @@ void nrf52_pwm2_irq(void)
 // Handles on the instances of this class used the three PWM modules (if present)
 NRF52PWM* NRF52PWM::nrf52_pwm_driver[NRF52PWM_PWM_PERIPHERALS] = { NULL };
 
-NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uint16_t id) : PWM(*module), upstream(source)
+NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate, uint16_t id) : PWM(*module), upstream(source)
 {
     // initialise state
     this->id = id;
@@ -103,7 +103,7 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate, uin
  * Determine the DAC playback sample rate to the given frequency.
  * @return the current sample rate.
  */
-int NRF52PWM::getSampleRate()
+float NRF52PWM::getSampleRate()
 {
     return sampleRate;
 }
@@ -121,7 +121,7 @@ int NRF52PWM::getSampleRange()
  * Change the DAC playback sample rate to the given frequency.
  * @param frequency The new sample playback frequency.
  */
-int NRF52PWM::setSampleRate(int frequency)
+float NRF52PWM::setSampleRate(float frequency)
 {
     return setPeriodUs(1000000 / frequency);
 }
@@ -130,7 +130,7 @@ int NRF52PWM::setSampleRate(int frequency)
  * Change the DAC playback sample rate to the given period.
  * @param period The new sample playback period, in microseconds.
  */
-int NRF52PWM::setPeriodUs(int period)
+int NRF52PWM::setPeriodUs(float period)
 {
     int prescaler = 0;
     int clock_frequency = 16000000;
@@ -162,7 +162,7 @@ int NRF52PWM::setPeriodUs(int period)
  * Determine the current DAC playback period.
  * @return period The sample playback period, in microseconds.
  */
-int NRF52PWM::getPeriodUs()
+float NRF52PWM::getPeriodUs()
 {
     return periodUs;
 }

@@ -28,8 +28,8 @@ private:
     bool            streaming;              // Determines if the output is streamed, or discrete. Streamed mode maintains ordered, discrete repeats playout most recent data provided.
     bool            repeatOnEmpty;          // Determines the behaviour of the PWM if a buffer underflow occurs.
     int             dataReady;              // Count of the number of input buffers awaiting playout
-    int             sampleRate;
-    int             periodUs;               // Period between output samples, in microseconds
+    float           sampleRate;
+    float           periodUs;               // Period between output samples, in microseconds
     uint8_t         bufferPlaying;          // ID of the buffer currently being played (0 or 1). Output is hardware double buffered.
     int8_t          stopStreamingAfterBuf;  // When stopping, the last buffer ID to play beforhand. -1 if no stop is scheduled.
     ManagedBuffer   buffer[2];              // The ManagedBuffers currently being used by the PWN hardware
@@ -51,18 +51,18 @@ public:
       * @param sampleRate The frequency (in Hz) that data will be presented.
       * @param id The id to use for the message bus when transmitting events.
       */
-    NRF52PWM(NRF_PWM_Type *module, DataSource &source, int sampleRate = NRF52PWM_DEFAULT_FREQUENCY, uint16_t id = DEVICE_ID_SYSTEM_DAC);
+    NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate = NRF52PWM_DEFAULT_FREQUENCY, uint16_t id = DEVICE_ID_SYSTEM_DAC);
 
     /**
      * Callback provided when data is ready.
      */
-	virtual int pullRequest();
+    virtual int pullRequest();
 
     /**
      * Determine the DAC playback sample rate to the given frequency.
      * @return the current sample rate.
      */
-    int getSampleRate();
+    float getSampleRate();
 
     /**
      * Determine the maximum unsigned vlaue that can be loaded into the PWM data values, for the current
@@ -74,20 +74,20 @@ public:
      * Change the DAC playback sample rate to the given frequency.
      * @param frequency The new sample playback frequency.
      */
-    int setSampleRate(int frequency);
+    float setSampleRate(float frequency);
 
     /**
      * Determine the current DAC playback period.
      * @return period The sample playback period, in microseconds.
      */
-    int getPeriodUs();
+    float getPeriodUs();
 
 
     /**
      * Change the DAC playback sample rate to the given period.
      * @param period The new sample playback period, in microseconds.
      */
-    int setPeriodUs(int period);
+    int setPeriodUs(float period);
 
     /** 
      * Defines the mode in which the PWM module will operate, in terms of how it interprets data provided from the DataSource:
