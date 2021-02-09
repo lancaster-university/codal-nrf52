@@ -80,8 +80,17 @@ int NRF52I2C::setFrequency(uint32_t frequency)
         freq = NRF_TWIM_FREQ_250K;
     if (frequency >= 400000)
         freq = NRF_TWIM_FREQ_400K;
+
     nrf_twim_disable(p_twim);
     nrf_twim_frequency_set(p_twim, freq);
+
+// Apply Nordic silicon errata #219 if so configured.
+// https://infocenter.nordicsemi.com/index.jsp?topic=%2Ferrata_nRF52833_Rev1%2FERR%2FnRF52833%2FRev1%2Flatest%2Fanomaly_833_219.html&anchor=anomaly_833_219
+#if CONFIG_ENABLED(NRF52I2C_ERRATA_219)
+    if (frequency == 400000)
+        p_twim->FREQUENCY = 0x06200000UL;
+#endif
+
     nrf_twim_enable(p_twim);
 
     return DEVICE_OK;
