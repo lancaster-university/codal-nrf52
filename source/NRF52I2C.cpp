@@ -103,6 +103,10 @@ int NRF52I2C::waitForStop(int evt)
             nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_RESUME);
             nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_STOP);
             res = DEVICE_I2C_ERROR;
+
+            // Wait for STOP task to complete.
+            // Ensures the I2C hardware is idle when the user code initiates a subsequent I2C transcaction.
+            while(!nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_STOPPED));
             break;
         }
 
