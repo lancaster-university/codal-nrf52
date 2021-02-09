@@ -20,6 +20,10 @@ NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal:
     if (!p_twim)
         target_panic(DEVICE_HARDWARE_CONFIGURATION_ERROR);
 
+    // Disable high-side pin drivers on SDA and SCL pins.
+    sda.setDriveMode(6);
+    scl.setDriveMode(6);
+
     // Ensure all I2C drivers on the bus are fully reset
     clearBus();
 
