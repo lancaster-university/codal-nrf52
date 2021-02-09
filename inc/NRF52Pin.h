@@ -402,6 +402,23 @@ namespace codal
 
 
         /**
+         * Configures this IO pin drive mode to based on the provided parameter.
+         * Valid values are:
+         *
+         *  0 Standard '0', standard '1'
+         *  1 High drive '0', standard '1'
+         *  2 Standard '0', high drive '1'
+         *  3 High drive '0', high 'drive '1''
+         *  4 Disconnect '0' standard '1'
+         *  5 Disconnect '0', high drive '1'
+         *  6 Standard '0'. disconnect '1'
+         *  7 High drive '0', disconnect '1'
+         *
+         * @param value the value to write to this pin's output drive configuration register
+         */
+        int setDriveMode(int value);
+
+        /**
          * Configures this IO pin as a high drive pin (capable of sourcing/sinking greater current).
          * By default, pins are STANDARD drive.
          *

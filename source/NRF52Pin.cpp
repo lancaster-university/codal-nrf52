@@ -887,6 +887,35 @@ NRF52Pin::getPulseUs(int timeout)
 }
 
 /**
+ * Configures this IO pin drive mode to based on the provided parameter.
+ * Valid values are:
+ *
+ *  0 Standard '0', standard '1'
+ *  1 High drive '0', standard '1'
+ *  2 Standard '0', high drive '1'
+ *  3 High drive '0', high 'drive '1''
+ *  4 Disconnect '0' standard '1'
+ *  5 Disconnect '0', high drive '1'
+ *  6 Standard '0'. disconnect '1'
+ *  7 High drive '0', disconnect '1'
+ *
+ * @param value the value to write to this pin's output drive configuration register
+ */
+int NRF52Pin::setDriveMode(int value)
+{
+    if (value < 0 || value > 7)
+        return DEVICE_INVALID_PARAMETER;
+
+    uint32_t s = PORT->PIN_CNF[PIN] & 0xfffff8ff;
+
+    s |= (value << 8);
+
+    PORT->PIN_CNF[PIN] = s;
+
+    return DEVICE_OK;
+}
+
+/**
  * Configures this IO pin as a high drive pin (capable of sourcing/sinking greater current).
  * By default, pins are STANDARD drive.
  *
@@ -894,14 +923,7 @@ NRF52Pin::getPulseUs(int timeout)
  */
 int NRF52Pin::setHighDrive(bool value)
 {
-    uint32_t s = PORT->PIN_CNF[PIN] & 0xfffff8ff;
-
-    if (value)
-        s |= 0x00000300;
-
-    PORT->PIN_CNF[PIN] = s;
-
-    return DEVICE_OK;
+    return setDriveMode(value ? 3 : 0);
 }
 
 /**
