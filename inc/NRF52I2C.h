@@ -37,6 +37,8 @@ namespace codal
  */
 class NRF52I2C : public codal::I2C
 {
+    int minimumBusIdlePeriod;
+
     int waitForStop(int evt);
 protected:
     NRF52Pin &sda, &scl;
@@ -119,6 +121,16 @@ public:
       * Clear I2C bus
       */ 
     void clearBus();
+
+    /**
+     * Define the minimum bus idle period for this I2C bus.
+     * Thise controls the period of time the bus will remain idle between I2C transactions, 
+     * and also between subsequent write/read operations within a repeated START condition.
+     *
+     * @param period The minimum bus idle period, in microseconds
+     * @return DEVICE_OK on success, or DEVICE_INVALID_PARAMETER
+     */
+    int setBusIdlePeriod(int period);
 };
 } // namespace codal
 

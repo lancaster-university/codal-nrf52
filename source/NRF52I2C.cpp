@@ -12,6 +12,12 @@ using namespace codal;
  */
 NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal::I2C(sda, scl), sda(sda), scl(scl)
 {
+    minimumBusIdlePeriod = 0;
+
+#ifdef NRF52I2C_BUS_IDLE_PERIOD
+    minimumBusIdlePeriod = NRF52I2C_BUS_IDLE_PERIOD;
+#endif
+
     if(device == NULL)
         p_twim = (NRF_TWIM_Type *)allocate_peripheral(PERI_MODE_I2CM);
     else
@@ -134,6 +140,10 @@ int NRF52I2C::waitForStop(int evt)
 
         target_wait_us(10);
     }
+
+    if (minimumBusIdlePeriod)
+        target_wait_us(minimumBusIdlePeriod);
+
     return res;
 }
 
@@ -170,20 +180,17 @@ int NRF52I2C::write(uint16_t address, uint8_t *data, int len, bool repeated)
     nrf_twim_tx_buffer_set(p_twim, data, len);
 
     if (repeated)
-    {
         nrf_twim_shorts_set(p_twim, NRF_TWIM_SHORT_LASTTX_SUSPEND_MASK);
-        nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_SUSPENDED);
-    }
     else
         nrf_twim_shorts_set(p_twim, NRF_TWIM_SHORT_LASTTX_STOP_MASK);
+
+    nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_STARTTX);
 
     if (p_twim->EVENTS_SUSPENDED)
     {
         nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_RESUME);
         nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_SUSPENDED);
     }
-
-    nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_STARTTX);
 
     return waitForStop(repeated ? NRF_TWIM_EVENT_SUSPENDED : NRF_TWIM_EVENT_STOPPED);
 }
@@ -223,13 +230,13 @@ int NRF52I2C::read(uint16_t address, uint8_t *data, int len, bool repeated)
     if (!repeated)
         nrf_twim_shorts_set(p_twim, NRF_TWIM_SHORT_LASTRX_STOP_MASK);
 
+    nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_STARTRX);
+
     if (p_twim->EVENTS_SUSPENDED)
     {
         nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_RESUME);
         nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_SUSPENDED);
     }
-
-    nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_STARTRX);
 
     if (!repeated)
     {
@@ -278,4 +285,21 @@ int NRF52I2C::readRegister(uint16_t address, uint8_t reg, uint8_t *data, int len
 
     ret = read(address, data, length, false);
     return ret;
+}
+
+/**
+ * Define the minimum bus idle period for this I2C bus.
+ * Thise controls the period of time the bus will remain idle between I2C transactions,
+ * and also between subsequent write/read operations within a repeated START condition.
+ *
+ * @param period The minimum bus idle period, in microseconds
+ * @return DEVICE_OK on success, or DEVICE_INVALID_PARAMETER
+ */
+int NRF52I2C::setBusIdlePeriod(int period)
+{
+    if(period < 0)
+        return DEVICE_INVALID_PARAMETER;
+
+    minimumBusIdlePeriod = period;
+    return DEVICE_OK;
 }
