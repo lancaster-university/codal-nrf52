@@ -301,6 +301,10 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int o
     // Record the most recent sample, in case we're asked later.
     lastSample = *end++;
 
+#if NRF52ADC_RECENT_SAMPLE
+    recentSample = lastSample;
+#endif
+
     // Extract our channel data, if we're configured for data streaming.
     if (status & NRF52_ADC_CHANNEL_STATUS_CONNECTED)
     { 
@@ -366,6 +370,11 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
     dma[0] = ManagedBuffer(bufferSize);
     dma[1] = ManagedBuffer(bufferSize);
     activeDMA = 0;
+
+#if NRF52ADC_RECENT_SAMPLE
+    fillDMABuffer( dma[0]);
+    fillDMABuffer( dma[1]);
+#endif
 
     // Record a handle to this driver object, for use by the IRQ handler.
     nrf52_adc_driver = this;
@@ -461,6 +470,9 @@ void NRF52ADC::irq()
     {
         int nextDMA = (activeDMA + 1) % 2;
         dma[nextDMA] = ManagedBuffer(bufferSize);
+#if NRF52ADC_RECENT_SAMPLE
+        fillDMABuffer( dma[nextDMA]);
+#endif
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[nextDMA][0];
         NRF_SAADC->EVENTS_STARTED = 0;
     }
@@ -485,6 +497,9 @@ void NRF52ADC::enable()
     {
         // TODO: define MAXCNT to be a multiple of the number of active channels, to keep DMA transfers easy to manage.
         dma[activeDMA] = ManagedBuffer(bufferSize);
+#if NRF52ADC_RECENT_SAMPLE
+        fillDMABuffer( dma[activeDMA]);
+#endif
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[activeDMA][0];
         NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels); 
         NRF_SAADC->ENABLE = 1;
@@ -675,3 +690,159 @@ int NRF52ADC::releaseChannel(Pin& pin)
     return DEVICE_OK;
 }
 
+
+#if NRF52ADC_RECENT_SAMPLE
+
+NRF52ADCChannel* NRF52ADC::getEnabledChannel(Pin& pin)
+{
+    int c;
+
+    if (!nrf52_saadc_id.hasKey(pin.name))
+        return NULL;
+
+    c = nrf52_saadc_id.get(pin.name) - 1;
+
+    NRF52ADCChannel *pChannel = &channels[c];
+
+    if ( pChannel->isEnabled())
+    {
+      return pChannel;
+    }
+
+    pChannel->enable();
+    enabledChannels++;
+
+    // If this is the first channel enabled, enable the ADC.
+    // Otherwise, signal a STOP event to restart the ADC
+    // with this new channel included.
+
+    if (enabledChannels == 1)
+    {
+        channels[c].servicePendingRequests();
+        this->enable();
+
+        pChannel->waitForSample();
+    }
+    else
+    {
+        // This will trigger an EVENTS_END / EVENTS_STOPPED IRQ with 
+        // with data for the previous channel set-up
+        // and a TASKS_START via PPI with set-up for the previous channels
+
+        NRF_SAADC->TASKS_STOP = 1;
+
+        // During the irq, the channel set-up is changed
+        // The next EVENTS_END will likely have bad data
+        pChannel->waitForSample();
+
+        // Repeat the cycle, to get a TASKS_START with the updated set-up
+        NRF_SAADC->TASKS_STOP = 1;
+
+        pChannel->waitForSample();
+
+        // Wait for another EVENTS_END?
+        //pChannel->waitForSample();
+    }
+
+    return pChannel;
+}
+
+
+// fill buffer with invalid values
+// so updateRecentSamples can see which have been written
+
+void NRF52ADC::fillDMABuffer( ManagedBuffer &b)
+{
+  memset( &b[0], 0xFF, b.length());
+}
+
+
+void NRF52ADCChannel::waitForSample()
+{
+    status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
+    while( status & NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE);
+}
+
+
+uint16_t NRF52ADCChannel::getRecentSample( NRF52ADC *adc)
+{
+    if ( status & NRF52_ADC_CHANNEL_STATUS_ENABLED)
+    {
+        // flag that this channel wants an update
+        status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
+        adc->updateRecentSample();
+    }
+
+    // Clip off any samples below the negative rail...
+    int16_t s = recentSample;
+    if ( s < 0)
+        s = 0;
+
+    return (uint16_t) s;
+}
+
+
+bool NRF52ADCChannel::demuxRecentSample( ManagedBuffer dmaBuffer, int offset, int skip, int samplesInBuffer)
+{
+    if ( ( status & NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE) == 0)
+      return false;
+
+    // If we were waiting for a discrete sample to arrive, indicate that it's ready.
+    status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
+
+    int samples = samplesInBuffer - offset;
+    if ( samples > 0)
+    {
+        // Calculate number of samples for this channel
+        samples = ( samples % skip) ? (samples / skip + 1) : (samples / skip);
+
+        // Update the most recent sample, if there is one in this buffer
+        if ( samples > 0)
+        {
+            recentSample = ((int16_t *) &dmaBuffer[0])[ offset + ( samples - 1) * skip];
+        }
+    }
+    return true;
+}
+
+
+void NRF52ADC::updateRecentSample()
+{
+    target_disable_irq();
+    ManagedBuffer *pBuffer = new ManagedBuffer( dma[ activeDMA]);
+    target_enable_irq();
+
+    uint16_t *udata = ( uint16_t *) pBuffer->getBytes();
+
+    // binary search for the first unwritten sample (0xFFFF)
+    int samplesInBuffer = pBuffer->length() / 2;
+    int goodIdx = -1;
+    for ( int idx = samplesInBuffer - goodIdx; idx > 1; idx = samplesInBuffer - goodIdx)
+    {
+        idx = goodIdx + idx / 2;
+        if ( udata[ idx] == 0xFFFF)
+            samplesInBuffer = idx;
+        else
+            goodIdx = idx;
+    }
+
+    if ( samplesInBuffer)
+    {
+        int offset = 0;
+        for ( int channel = 0; channel < NRF52_ADC_CHANNELS; channel++)
+        {
+            if ( NRF_SAADC->CH[channel].PSELP)
+            {
+                if ( channels[channel].demuxRecentSample( *pBuffer, offset, enabledChannels, samplesInBuffer))
+                    break;
+                offset++;
+            }
+        }
+    }
+
+    target_disable_irq();
+    delete pBuffer;
+    target_enable_irq();
+}
+
+#endif //NRF52ADC_RECENT_SAMPLE

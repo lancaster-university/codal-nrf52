@@ -31,6 +31,12 @@ DEALINGS IN THE SOFTWARE.
 #ifndef NRF5_ADC_H
 #define NRF5_ADC_H
 
+#define NRF52ADC_RECENT_SAMPLE 1
+
+#if NRF52ADC_RECENT_SAMPLE
+class NRF52ADC;
+#endif
+
 //
 // Constants
 //
@@ -171,6 +177,16 @@ public:
      * @return 1 if this channel changes status, ero otherwise.
      */
     int servicePendingRequests();
+
+#if NRF52ADC_RECENT_SAMPLE
+    volatile int16_t recentSample;
+
+    uint16_t getRecentSample( NRF52ADC *adc);
+
+    bool demuxRecentSample( ManagedBuffer dmaBuffer, int offset, int skip, int samplesInBuffer);
+
+    void waitForSample();
+#endif
 };
 
 #define NRF52ADC_STATUS_PERIOD_CHANGED              0x01        // Indicates that the period of the ADC may have changed.
@@ -255,6 +271,13 @@ public:
      */
     int releaseChannel(Pin& pin);
 
+#if NRF52ADC_RECENT_SAMPLE
+    NRF52ADCChannel* getEnabledChannel(Pin& pin);
+
+    void fillDMABuffer( ManagedBuffer &b);
+    
+    void updateRecentSample();
+#endif
 };
 
 #endif

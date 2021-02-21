@@ -427,10 +427,17 @@ int NRF52Pin::getAnalogValue()
 
     if (adc)
     {
+#if NRF52ADC_RECENT_SAMPLE
+        NRF52ADCChannel *c = adc->getEnabledChannel(*this);
+
+        if (c)
+            return c->getRecentSample( adc) / 16;
+#else
         NRF52ADCChannel *c = adc->getChannel(*this);
 
         if (c)
             return c->getSample() / 16;
+#endif
     }
 
     return DEVICE_NOT_SUPPORTED;
