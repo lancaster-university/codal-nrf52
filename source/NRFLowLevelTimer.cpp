@@ -229,7 +229,7 @@ int NRFLowLevelTimer::setBitMode(TimerBitMode t)
             timer->BITMODE = 2;
             break;
         case BitMode32:
-            timer->BITMODE = 2;
+            timer->BITMODE = 3;
             break;
     }
 
