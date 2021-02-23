@@ -621,7 +621,7 @@ int NRF52ADC::setDmaBufferSize(int bufferSize)
  * @param pin The pin to attach.
  * @return a pointer to an NRF52ADCChannel on success, NULL if the given pin does not support analogue input, or if all channels are in use.
  */
-NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
+NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
 {
     int c;
 
@@ -630,9 +630,22 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
 
     c = nrf52_saadc_id.get(pin.name) - 1;
 
-    if (!channels[c].isEnabled())
+    if(activate)
+        this->activateChannel(&channels[c]);
+
+    return &channels[c];
+}
+
+int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
+{
+
+    if(channel==NULL)
+        return DEVICE_INVALID_PARAMETER;
+
+
+    if (!channel->isEnabled())
     {
-        channels[c].enable();
+        channel->enable();
         enabledChannels++;
 
         // If this is the first channel enabled, enable the ADC.
@@ -641,7 +654,7 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
 
         if (enabledChannels == 1)
         {
-            channels[c].servicePendingRequests();
+            channel->servicePendingRequests();
             this->enable();
         }
         else
@@ -650,8 +663,9 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
         }
     }
 
-    return &channels[c];
+    return DEVICE_OK;
 }
+
 /**
  * Release a previously a new ADC channel, if available, for the given pin.
  * @param pin The pin to detach.
