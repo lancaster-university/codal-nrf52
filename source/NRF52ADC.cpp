@@ -619,6 +619,7 @@ int NRF52ADC::setDmaBufferSize(int bufferSize)
 /**
  * Acquire a new ADC channel, if available, for the given pin.
  * @param pin The pin to attach.
+ * @param activate If the channel should start activated or not.
  * @return a pointer to an NRF52ADCChannel on success, NULL if the given pin does not support analogue input, or if all channels are in use.
  */
 NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
@@ -638,10 +639,8 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
 
 int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
 {
-
     if(channel==NULL)
         return DEVICE_INVALID_PARAMETER;
-
 
     if (!channel->isEnabled())
     {
@@ -651,7 +650,6 @@ int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
         // If this is the first channel enabled, enable the ADC.
         // Otherwise, signal a STOP event to restart the ADC
         // with this new channel included.
-
         if (enabledChannels == 1)
         {
             channel->servicePendingRequests();
@@ -662,7 +660,6 @@ int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
             NRF_SAADC->TASKS_STOP = 1;
         }
     }
-
     return DEVICE_OK;
 }
 

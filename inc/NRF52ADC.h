@@ -244,6 +244,7 @@ public:
     /**
      * Acquire a new ADC channel, if available, for the given pin.
      * @param pin The pin to attach.
+     * @param activate If the channel should start activated or not.
      * @return a pointer to an NRF52ADCChannel on success, NULL if the given pin does not support analogue input, or if all channels are in use.
      */
     NRF52ADCChannel* getChannel(Pin& pin, bool activate = true);
