@@ -28,11 +28,13 @@ list(APPEND INCLUDE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/templates/"
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/templates/${TEMPLATE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/drivers/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/drivers/src"
 )
 
 list(APPEND SOURCE_FILES "asm/CortexContextSwitch.s")
 list(APPEND SOURCE_FILES "nrfx/mdk/system_${DEV}.c")
 list(APPEND SOURCE_FILES "nrfx/mdk/gcc_startup_${DEV}.S")
+# list(APPEND SOURCE_FILES "nrfx/drivers/src/nrfx_usbd.c")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNRFX_PRS_ENABLED=0")
 
