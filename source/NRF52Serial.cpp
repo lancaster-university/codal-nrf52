@@ -153,6 +153,7 @@ int NRF52Serial::enableInterrupt(SerialInterruptType t)
 
         if(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT){
             nrf_uarte_rx_buffer_set(p_uarte_, dmaBuffer, CONFIG_SERIAL_DMA_BUFFER_SIZE);
+            bytesProcessed = 0;
             nrf_uarte_int_enable(p_uarte_, NRF_UARTE_INT_ERROR_MASK |
                                             NRF_UARTE_INT_ENDRX_MASK);
             nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STARTRX);
