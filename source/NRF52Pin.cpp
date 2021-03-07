@@ -721,7 +721,7 @@ void NRF52Pin::rise()
         pulseWidthEvent(DEVICE_PIN_EVT_PULSE_LO);
 
     if(status & IO_STATUS_EVENT_ON_EDGE)
-        Event(id, DEVICE_PIN_EVT_RISE, 0);
+        Event(id, DEVICE_PIN_EVT_RISE);
 
     if (status & IO_STATUS_INTERRUPT_ON_EDGE && gpio_irq)
         this->gpio_irq(1);
@@ -733,7 +733,7 @@ void NRF52Pin::fall()
         pulseWidthEvent(DEVICE_PIN_EVT_PULSE_HI);
 
     if(status & IO_STATUS_EVENT_ON_EDGE)
-        Event(id, DEVICE_PIN_EVT_FALL, 0);
+        Event(id, DEVICE_PIN_EVT_FALL);
 
     if (status & IO_STATUS_INTERRUPT_ON_EDGE && gpio_irq)
         this->gpio_irq(0);
