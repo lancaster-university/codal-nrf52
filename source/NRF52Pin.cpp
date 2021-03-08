@@ -50,8 +50,6 @@ using namespace codal;
 #define NUM_PINS 32
 #endif
 
-volatile uint32_t interrupt_enable = 0;
-
 static NRF52Pin *irq_pins[NUM_PINS];
 
 MemorySource* NRF52Pin::pwmSource = NULL;
@@ -66,38 +64,61 @@ TouchSensor* NRF52Pin::touchSensor = NULL;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+static void process_gpio_irq(NRF_GPIO_Type* GPIO_PORT, int pinNumberOffset)
+{
+    uint32_t    pinNumber;
+    uint32_t    latch;
+    NRF52Pin    *pin;
+
+    // Take a snapshot of the latched values.
+    latch = GPIO_PORT->LATCH;
+
+    // Handle any events raised on this port.
+    while(latch)
+    {
+        // Determine the most significant pin that has changed.
+        asm("mov r11, #31              \r\n"
+            "clz r12, %[value]         \r\n"
+            "sub %[result], r11, r12   \r\n"
+
+                : [result] "=r" (pinNumber)
+                : [value] "r" (latch)
+                : "r11", "r12", "cc"
+        );
+
+        // Record that we have received this change event
+        latch &= ~(1 << pinNumber);
+
+        // Determine the NRF52Pin associated with this IRQ event
+        pin = irq_pins[pinNumber + pinNumberOffset];
+
+        // If that pin is registered for edge events
+        if (pin && (pin->status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
+        {
+            // Flip the sense bit of this pin to the opposite polarity (to sense the next edge)
+            GPIO_PORT->PIN_CNF[pinNumber] ^= 0x00010000;
+
+            // Invoke rise/fall handler in the pin according to the sensed polarity of this event
+            if (GPIO_PORT->PIN_CNF[pinNumber] & 0x00010000)
+                pin->rise();
+            else
+                pin->fall();
+        }
+    }
+
+    GPIO_PORT->LATCH = 0xffffffff;
+}
+
 void GPIOTE_IRQHandler(void)
 {
     if (NRF_GPIOTE->EVENTS_PORT)
     {
+        // Acknowledge the interrupt
         NRF_GPIOTE->EVENTS_PORT = 0;
-        for (uint8_t i = 0; i <= 31; i++)
-        {
-            if (interrupt_enable & (1 << i) && irq_pins[i] && NRF_P0->LATCH & (1 << i))
-            {
-                uint32_t currCnf = NRF_P0->PIN_CNF[i];
-                uint8_t currSense = (currCnf & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos;
 
-                // hi: latch indicates a state change... determine if we were looking for hi or lo.
-                if (currSense == GPIO_PIN_CNF_SENSE_High)
-                {
-                    // swap!
-                    NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
-                    irq_pins[i]->rise();
-                }
-                else
-                {
-                    // swap!
-                    NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
-                    irq_pins[i]->fall();
-                }
-            }
-        }
-        // make sure to clear everything
-        NRF_P0->LATCH = 0xffffffff;
-#ifdef NRF_P1
-        NRF_P1->LATCH = 0xffffffff;
-#endif
+        process_gpio_irq(NRF_P0, 0);
+        process_gpio_irq(NRF_P1, 32);
     }
 }
 
@@ -185,7 +206,6 @@ void NRF52Pin::disconnect()
     {
         // disconnect pin cng
         PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
-        interrupt_enable &= ~(1 << this->name);
     }
 
     // Reset status flags to zero, but retain preferred TouchSense and Polarity mode.
@@ -767,8 +787,6 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
 
         PORT->LATCH = 1 << PIN; // clear any pending latch
 
-        // configure as interrupt in
-        interrupt_enable |= (1 << this->name);
         enabled = true;
     }
 
