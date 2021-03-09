@@ -770,7 +770,7 @@ void NRF52Pin::fall()
   */
 int NRF52Pin::enableRiseFallEvents(int eventType)
 {
-    bool enabled = false;
+    bool enablePulseIn = false;
 
     // if we are in neither of the two modes, configure pin as a TimedInterruptIn.
     if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
@@ -786,10 +786,20 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
             PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
 
         PORT->LATCH = 1 << PIN; // clear any pending latch
-
-        enabled = true;
     }
 
+    // If we are moving into a PULSE_ON_EDGE mode record that we need to start a pulse detector object
+    if (!(status & IO_STATUS_EVENT_PULSE_ON_EDGE) && eventType == DEVICE_PIN_EVENT_ON_PULSE)
+        enablePulseIn = true;
+
+    // If we're moving out of pulse on edge mode (into plain edge detect mode), turn stop the pulse detecor.
+    if ((status & IO_STATUS_EVENT_PULSE_ON_EDGE) && eventType != DEVICE_PIN_EVENT_ON_PULSE)
+    {
+        delete ((PulseIn *)obj);
+        obj = NULL;
+    }
+
+    // Clear all state related to edge/pulse detection
     status &= ~(IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE);
 
     // set our status bits accordingly.
@@ -800,7 +810,7 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     else if(eventType == DEVICE_PIN_INTERRUPT_ON_EDGE)
         status |= IO_STATUS_INTERRUPT_ON_EDGE;
 
-    if (enabled && eventType == DEVICE_PIN_EVENT_ON_PULSE)
+    if (enablePulseIn)
     {
         // Create a new object to track pulse timing data.
         // Set the initial pulse edge to the current time in case the line is currently active.
