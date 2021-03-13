@@ -290,6 +290,9 @@ int NRF52Pin::getDigitalValue()
     // Record our mode, so we can optimise later.
     status |= IO_STATUS_DIGITAL_IN;
 
+    // Ensure the current pull up/down configuration for this pin is applied.
+    setPull(pullMode);
+
     // return the current state of the pin
     return (PORT->IN & (1 << PIN)) ? 1 : 0;
 }
@@ -297,14 +300,14 @@ int NRF52Pin::getDigitalValue()
 /**
  * Configures this IO pin as a digital input with the specified internal pull-up/pull-down configuraiton (if necessary) and tests its current value.
  *
- * @param pull one of the mbed pull configurations: PullUp, PullDown, PullNone
+ * @param pull one of the pull configurations: PullMode::Up, PullMode::Down, or PullMode::None.
  *
  * @return 1 if this input is high, 0 if input is LO, or DEVICE_NOT_SUPPORTED
  *         if the given pin does not have digital capability.
  *
  * @code
  * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
- * P0.getDigitalValue(PullUp); // P0 is either 0 or 1;
+ * P0.getDigitalValue(PullMode::Up); 
  * @endcode
  */
 int NRF52Pin::getDigitalValue(PullMode pull)
@@ -687,7 +690,7 @@ int NRF52Pin::getAnalogPeriod()
 /**
   * Configures the pull of this pin.
   *
-  * @param pull one of the mbed pull configurations: PullUp, PullDown, PullNone
+  * @param pull one of the pull configurations: PullMode::Up, PullMode::Down, or PullMode::None.
   *
   * @return DEVICE_NOT_SUPPORTED if the current pin configuration is anything other
   *         than a digital input, otherwise DEVICE_OK.
@@ -775,7 +778,7 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     // if we are in neither of the two modes, configure pin as a TimedInterruptIn.
     if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
     {
-        int v = getDigitalValue(pullMode);
+        int v = getDigitalValue();
 
         // PORT->DETECTMODE = 1; // latched-detect
 
