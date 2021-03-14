@@ -474,6 +474,7 @@ void NRF52ADC::irq()
                 status &= ~NRF52ADC_STATUS_PERIOD_CHANGED;
 
                 NRF_SAADC->ENABLE = 0;
+                NRF_SAADC->RESULT.PTR = NRF_SAADC->RESULT.PTR;
                 NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels);  
                 setSamplePeriod(samplePeriod);
                 NRF_SAADC->ENABLE = 1;
