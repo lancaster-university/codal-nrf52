@@ -60,9 +60,10 @@ extern "C" void SAADC_IRQHandler()
 
 /**
  * Constructor
+ * @param adc reference to the ADC hardware used by this channel
  * @param channel The analog identifier of this channel
  */
-NRF52ADCChannel::NRF52ADCChannel(uint8_t channel) : output(*this)
+NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), output(*this)
 {
     this->channel = channel;
     this->size = buffer.length();
@@ -208,17 +209,35 @@ ManagedBuffer NRF52ADCChannel::pull()
  */
 uint16_t NRF52ADCChannel::getSample()
 {
-    // Flag that we need to take a sample
-    status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
+    if (!isEnabled())
+        return 0;
 
-    // Cycle the ADC, so that it pushes a DMA buffer.
-    NRF_SAADC->INTENSET =  (SAADC_INTENSET_RESULTDONE_Enabled << SAADC_INTENSET_RESULTDONE_Pos);
-    //NRF_SAADC->TASKS_STOP = 1;
+    // Get the currently active DMA buffer
+    ManagedBuffer b = adc.getActiveDMABuffer();
 
-    // Spin until the sample arrives, then return the result.
-    while(status & NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE);
+    // Determine the offset of skip value of this channel within the buffer.
+    int skip = adc.getActiveChannelCount();
+    int offset = adc.getChannelOffset(channel);
 
-    // Clip off any samples below the negative rail...
+    // Generate pointers to the start and end of the DMA buffer
+    uint16_t *ptr = (uint16_t *) b.getBytes();
+    uint16_t *end = (uint16_t *) (b.getBytes() + b.length());
+
+    // Account for multiplexed offset
+    ptr += offset;
+
+    // Find the last entry in the buffer that's been written for this channel
+    if (*ptr != 0x8888)
+    {
+        while (*ptr != 0x8888 && ptr < end)
+            ptr += skip;
+
+        ptr -= skip;
+
+        lastSample = *((int16_t *) ptr);
+    }
+
+    // Clip off the negative rail
     if (lastSample < 0)
         lastSample = 0;
 
@@ -286,9 +305,6 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int o
     if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0)
         return;
 
-    // If we were waiting for a discrete sample to arrive, indicate that it's ready.
-    status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
-
     // If this buffer is too shot to contain information for us, ignore it.
     // n.b. The above test is safe, as a short buffer implies that our lastSample is already up to date.
     if (length <= offset)
@@ -355,7 +371,7 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int o
  * @param samplePeriod the time between samples generated in the output buffer (in microseconds)
  * @param id The id to use for the message bus when transmitting events.
  */
-NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : timer(adcTimer), channels{0,1,2,3,4,5,6,7}
+NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : timer(adcTimer), channels{NRF52ADCChannel(*this, 0), NRF52ADCChannel(*this, 1), NRF52ADCChannel(*this, 2), NRF52ADCChannel(*this, 3), NRF52ADCChannel(*this, 4), NRF52ADCChannel(*this, 5), NRF52ADCChannel(*this, 6), NRF52ADCChannel(*this, 7)}
 {
     // Store our configuration data.
     this->id = id;
@@ -363,8 +379,8 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
     this->bufferSize = NRF52_ADC_DMA_SIZE;
 
     // Initialise receive buffers
-    dma[0] = ManagedBuffer(bufferSize);
-    dma[1] = ManagedBuffer(bufferSize);
+    dma[0] = allocateDMABuffer();
+    dma[1] = allocateDMABuffer();
     activeDMA = 0;
 
     // Record a handle to this driver object, for use by the IRQ handler.
@@ -400,6 +416,21 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
     timer.disableIRQ();
 }
 
+/**
+ * Allocate a new DMA buffer
+ * @return A newly allocated DMA buffer, initialized and ready for use.
+ */
+ManagedBuffer NRF52ADC::allocateDMABuffer()
+{
+    ManagedBuffer b(bufferSize, BufferInitialize::None);
+
+    // Fill the buffer with values unused by the ADC hardware. We can use this to perform demuxing 
+    // of a live DMA buffer as it is being filled. :)
+    // We choose 0x88 as a 16 bit signed 0x8888 is an invalid 14 bit sample (either +ve or -ve)
+    b.fill(0x88);
+
+    return b;
+}
 
 void NRF52ADC::irq()
 {
@@ -460,7 +491,7 @@ void NRF52ADC::irq()
     if (NRF_SAADC->EVENTS_STARTED)
     {
         int nextDMA = (activeDMA + 1) % 2;
-        dma[nextDMA] = ManagedBuffer(bufferSize);
+        dma[nextDMA] = allocateDMABuffer();
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[nextDMA][0];
         NRF_SAADC->EVENTS_STARTED = 0;
     }
@@ -480,11 +511,10 @@ void NRF52ADC::irq()
  */
 void NRF52ADC::enable()
 {
-
     if (NRF_SAADC->ENABLE == 0 && enabledChannels > 0)
     {
         // TODO: define MAXCNT to be a multiple of the number of active channels, to keep DMA transfers easy to manage.
-        dma[activeDMA] = ManagedBuffer(bufferSize);
+        dma[activeDMA] = allocateDMABuffer();
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[activeDMA][0];
         NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels); 
         NRF_SAADC->ENABLE = 1;
@@ -614,6 +644,44 @@ int NRF52ADC::setDmaBufferSize(int bufferSize)
 {
     this->bufferSize = bufferSize;
     return DEVICE_OK;
+}
+
+/**
+ * Gets the currently active DMA buffer (the one currently being filled)
+ * @return the currently active DMA buffer
+ */
+ManagedBuffer NRF52ADC::getActiveDMABuffer()
+{
+    return dma[activeDMA];
+}
+
+/**
+ * Determine the number of active DMA channels currently being multiplexed
+ * @return the number of active channels
+ */
+int NRF52ADC::getActiveChannelCount()
+{
+    return enabledChannels;
+}
+
+/**
+ * Determine the offset of the given DMA channels in the raw multiplexed data stream.
+ * @return the offset of the channel in the stream
+ */
+int NRF52ADC::getChannelOffset(int channel)
+{
+    int offset = 0;
+
+    for (int c = 0; c < NRF52_ADC_CHANNELS; c++)
+    {
+        if (NRF_SAADC->CH[c].PSELP)
+            offset++;
+
+        if (c == channel)
+            return offset-1;
+    }
+
+    return DEVICE_INVALID_PARAMETER;
 }
 
 /**

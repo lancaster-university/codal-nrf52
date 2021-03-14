@@ -55,10 +55,13 @@ using namespace codal;
 #define NRF52_ADC_CHANNEL_STATUS_ENABLED                0x10
 #define NRF52_ADC_CHANNEL_STATUS_CONNECTED              0x20
 
+class NRF52ADC;
+
 class NRF52ADCChannel : public DataSource
 {
 private:
 
+    NRF52ADC            &adc;
     ManagedBuffer       buffer;
     volatile int16_t    lastSample;
     int16_t             size;
@@ -71,9 +74,10 @@ public:
 
     /**
      * Constructor
+     * @param adc reference to the ADC hardware used by this channel
      * @param channel The analog identifier of this channel
      */
-    NRF52ADCChannel(uint8_t channel);
+    NRF52ADCChannel(NRF52ADC &adc, uint8_t channel);
 
     /**
      * Enable this component
@@ -201,6 +205,12 @@ public:
     NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id = DEVICE_ID_SYSTEM_ADC);
 
     /**
+     * Allocate a new DMA buffer
+     * @return A newly allocated DMA buffer, initialized and ready for use.
+     */
+    ManagedBuffer allocateDMABuffer();
+
+    /**
      * Interrupt callback when playback of DMA buffer has completed
      */
     void irq();
@@ -240,6 +250,24 @@ public:
      *  @param the new size of the DMA buffer used in bytes. Note that effective buffer size used may be less, to 16 bit align with the number of active channels.
      */
     int setDmaBufferSize(int bufferSize);
+
+    /**
+     * Gets the currently active DMA buffer (the one currently being filled)
+     * @return the currently active DMA buffer
+     */
+    ManagedBuffer getActiveDMABuffer();
+
+    /**
+     * Determine the number of active DMA channels currently being multiplexed
+     * @return the number of active channels
+     */
+    int getActiveChannelCount();
+
+    /**
+     * Determine the offset of the given DMA channels in the raw multiplexed data stream.
+     * @return the offset of the channel in the stream
+     */
+    int getChannelOffset(int channel);
 
     /**
      * Acquire a new ADC channel, if available, for the given pin.
