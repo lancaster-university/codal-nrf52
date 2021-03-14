@@ -479,6 +479,7 @@ void NRF52ADC::irq()
                 setSamplePeriod(samplePeriod);
                 NRF_SAADC->ENABLE = 1;
                 NRF_SAADC->TASKS_START = 1;
+                while(!NRF_SAADC->EVENTS_STARTED);
             }
         }
 
@@ -495,15 +496,6 @@ void NRF52ADC::irq()
         dma[nextDMA] = allocateDMABuffer();
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[nextDMA][0];
         NRF_SAADC->EVENTS_STARTED = 0;
-    }
-
-    if (NRF_SAADC->EVENTS_RESULTDONE && NRF_SAADC->INTENSET & (SAADC_INTENSET_RESULTDONE_Enabled << SAADC_INTENSET_RESULTDONE_Pos))
-    {
-        // A result has completed, and we've been flagged to interrupt on sample complete.
-        // Clear the request and issue a STOP event to flush our buffer.
-        NRF_SAADC->INTENCLR =  (SAADC_INTENSET_RESULTDONE_Enabled << SAADC_INTENSET_RESULTDONE_Pos);
-        NRF_SAADC->EVENTS_RESULTDONE = 0;
-        NRF_SAADC->TASKS_STOP = 1;
     }
 }
 
