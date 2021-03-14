@@ -652,7 +652,13 @@ int NRF52ADC::setDmaBufferSize(int bufferSize)
  */
 ManagedBuffer NRF52ADC::getActiveDMABuffer()
 {
-    return dma[activeDMA];
+    ManagedBuffer b;
+
+    target_disable_irq();
+    b = dma[activeDMA];
+    target_enable_irq();
+
+    return b;
 }
 
 /**
