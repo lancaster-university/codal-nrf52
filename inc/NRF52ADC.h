@@ -183,7 +183,7 @@ public:
 class NRF52ADC : public CodalComponent
 {
 
-private:
+public:
 	uint32_t            samplePeriod;                           // The ADC sample period, in microseconds.
     uint16_t            bufferSize;                             // The size of our buffer.
     uint8_t             enabledChannels;                        // Determines the number of currently active channels.
