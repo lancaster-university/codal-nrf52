@@ -125,27 +125,33 @@ int NRF52ADCChannel::setBufferSize(int bufferSize)
 /**
  * Enable this channel
  */
-int NRF52ADCChannel::servicePendingRequests()
+int NRF52ADCChannel::servicePendingRequests(bool adcRunning)
 {
     int result = 0;
 
     if (status & NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE)
     {
-        NRF_SAADC->CH[channel].PSELP = channel+1;
-        NRF_SAADC->CH[channel].PSELN = 0;
-        adc.enabledChannels++;
-        status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE;
-        status |= NRF52_ADC_CHANNEL_STATUS_ENABLED;
+        if(adcRunning)
+        {
+            NRF_SAADC->CH[channel].PSELP = channel+1;
+            NRF_SAADC->CH[channel].PSELN = 0;
+            adc.enabledChannels++;
+            status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE;
+            status |= NRF52_ADC_CHANNEL_STATUS_ENABLED;
+        }
         result=1;
     }
 
     if (status & NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE)
     {
-        NRF_SAADC->CH[channel].PSELP = 0;
-        NRF_SAADC->CH[channel].PSELN = 0;
-        adc.enabledChannels--;
-        status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE;
-        status &= ~NRF52_ADC_CHANNEL_STATUS_ENABLED;
+        if(adcRunning)
+        {
+            NRF_SAADC->CH[channel].PSELP = 0;
+            NRF_SAADC->CH[channel].PSELN = 0;
+            adc.enabledChannels--;
+            status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE;
+            status &= ~NRF52_ADC_CHANNEL_STATUS_ENABLED;
+        }
         result=1;
     }
 
@@ -216,13 +222,6 @@ uint16_t NRF52ADCChannel::getSample()
 
     // Get the currently active DMA buffer
     ManagedBuffer b = adc.getActiveDMABuffer();
-
-    //uint16_t *x = (uint16_t *) &b[0];
-    //uint16_t *y = (uint16_t *) &b[2];
-    //uint16_t *z = (uint16_t *) &b[4];
-    //
-    //DMESG("[DMABUF: %d %d %d]", (int) *x, (int) *y, (int)*z);
-    //DMESG("[D: %d]", (int) *x);
 
     // Determine the offset of skip value of this channel within the buffer.
     int skip = adc.getActiveChannelCount();
@@ -467,7 +466,7 @@ void NRF52ADC::irq()
 
         // Perform a service callback, to add/remove channels from the channel list. 
         for (int channel = 0; channel < NRF52_ADC_CHANNELS; channel++)
-            channelsChanged += channels[channel].servicePendingRequests();
+            channelsChanged += channels[channel].servicePendingRequests(false);
 
         // Indicate we've processed the interrupt
         if(NRF_SAADC->EVENTS_END)
@@ -482,16 +481,18 @@ void NRF52ADC::irq()
             if ((status & NRF52ADC_STATUS_PERIOD_CHANGED) || (channelsChanged > 0 && enabledChannels > 0))
             {
                 status &= ~NRF52ADC_STATUS_PERIOD_CHANGED;
-                
-                timer.disable();
+
                 NRF_SAADC->ENABLE = 0;
-                setSamplePeriod(samplePeriod);
-                NRF_SAADC->RESULT.PTR = NRF_SAADC->RESULT.PTR;
+
+                for (int channel = 0; channel < NRF52_ADC_CHANNELS; channel++)
+                    channelsChanged += channels[channel].servicePendingRequests(true);
+
                 NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels);  
+                setSamplePeriod(samplePeriod);
                 NRF_SAADC->ENABLE = 1;
+
                 NRF_SAADC->TASKS_START = 1;
                 while(!NRF_SAADC->EVENTS_STARTED);
-                timer.enable();
             }
         }
 
@@ -501,7 +502,7 @@ void NRF52ADC::irq()
         if (enabledChannels == 0)
             NRF_SAADC->ENABLE = 0;
     }
- 
+
     if (NRF_SAADC->EVENTS_STARTED)
     {
         int nextDMA = (activeDMA + 1) % 2;
@@ -719,7 +720,7 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
 
         if (enabledChannels == 0)
         {
-            channels[c].servicePendingRequests();
+            channels[c].servicePendingRequests(true);
             this->enable();
         }
         else

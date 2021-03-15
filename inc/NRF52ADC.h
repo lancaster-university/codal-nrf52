@@ -174,7 +174,7 @@ public:
      * IRQ callback to activate/deactivate a pending channel
      * @return 1 if this channel changes status, ero otherwise.
      */
-    int servicePendingRequests();
+    int servicePendingRequests(bool adcRunning);
 };
 
 #define NRF52ADC_STATUS_PERIOD_CHANGED              0x01        // Indicates that the period of the ADC may have changed.
