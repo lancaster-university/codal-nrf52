@@ -619,9 +619,10 @@ int NRF52ADC::setDmaBufferSize(int bufferSize)
 /**
  * Acquire a new ADC channel, if available, for the given pin.
  * @param pin The pin to attach.
+ * @param activate If the channel should start activated or not.
  * @return a pointer to an NRF52ADCChannel on success, NULL if the given pin does not support analogue input, or if all channels are in use.
  */
-NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
+NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
 {
     int c;
 
@@ -630,18 +631,33 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
 
     c = nrf52_saadc_id.get(pin.name) - 1;
 
-    if (!channels[c].isEnabled())
+    if(activate)
+        this->activateChannel(&channels[c]);
+
+    return &channels[c];
+}
+
+/**
+ * Activate a ADC channel
+ * @param channel The channel to activate.
+ * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if the given channel does not exist.
+ */
+int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
+{
+    if(channel==NULL)
+        return DEVICE_INVALID_PARAMETER;
+
+    if (!channel->isEnabled())
     {
-        channels[c].enable();
+        channel->enable();
         enabledChannels++;
 
         // If this is the first channel enabled, enable the ADC.
         // Otherwise, signal a STOP event to restart the ADC
         // with this new channel included.
-
         if (enabledChannels == 1)
         {
-            channels[c].servicePendingRequests();
+            channel->servicePendingRequests();
             this->enable();
         }
         else
@@ -649,9 +665,9 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
             NRF_SAADC->TASKS_STOP = 1;
         }
     }
-
-    return &channels[c];
+    return DEVICE_OK;
 }
+
 /**
  * Release a previously a new ADC channel, if available, for the given pin.
  * @param pin The pin to detach.
