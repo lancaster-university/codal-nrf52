@@ -637,6 +637,11 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
     return &channels[c];
 }
 
+/**
+ * Activate a ADC channel
+ * @param channel The channel to activate.
+ * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if the given channel does not exist.
+ */
 int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
 {
     if(channel==NULL)
