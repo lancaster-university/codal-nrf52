@@ -27,6 +27,8 @@ DEALINGS IN THE SOFTWARE.
 #if CONFIG_ENABLED(DEVICE_USB)
 #include "CodalDmesg.h"
 #include "nrfx_usbd.h"
+#include "nrfx_power.h"
+#include "nrfx_clock.h"
 #include "nrfx_usbd_errata.h"
 
 #define LOG DMESG
@@ -72,213 +74,106 @@ static UsbEndpointOut *findOutEp(int ep)
     return NULL;
 }
 
+// void POWER_CLOCK_IRQHandler() {
+//     while(1);
+//     LOG("PCIRQ");
+//     if (nrf_power_event_get_and_clear(NRF_POWER, NRF_POWER_EVENT_USBDETECTED))
+//     {  
+//         LOG("DETECT");
+//         if (!NRF_USBD->ENABLE)
+//         {
+//             nrf_usbd_eventcause_clear(NRF_USBD, USBD_EVENTCAUSE_READY_Msk);
+//             if ( nrfx_usbd_errata_187() )
+//             {
+//                 // CRITICAL_REGION_ENTER();
+//                 if ( *((volatile uint32_t *) (0x4006EC00)) == 0x00000000 )
+//                 {
+//                     *((volatile uint32_t *) (0x4006EC00)) = 0x00009375;
+//                     *((volatile uint32_t *) (0x4006ED14)) = 0x00000003;
+//                     *((volatile uint32_t *) (0x4006EC00)) = 0x00009375;
+//                 }
+//                 else
+//                 {
+//                     *((volatile uint32_t *) (0x4006ED14)) = 0x00000003;
+//                 }
+//                 // CRITICAL_REGION_EXIT();
+//             }
 
+//             if ( nrfx_usbd_errata_171() )
+//             {
+//                 // CRITICAL_REGION_ENTER();
+//                 if ( *((volatile uint32_t *) (0x4006EC00)) == 0x00000000 )
+//                 {
+//                     *((volatile uint32_t *) (0x4006EC00)) = 0x00009375;
+//                     *((volatile uint32_t *) (0x4006EC14)) = 0x000000C0;
+//                     *((volatile uint32_t *) (0x4006EC00)) = 0x00009375;
+//                 }
+//                 else
+//                 {
+//                     *((volatile uint32_t *) (0x4006EC14)) = 0x000000C0;
+//                 }
+//                 // CRITICAL_REGION_EXIT();
+//             }
+//             nrf_clock_event_clear(NRF_CLOCK, NRF_CLOCK_EVENT_HFCLKSTARTED);
+//             nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_HFCLKSTART);
+//             nrf_usbd_enable(NRF_USBD);
+//         }
+//     }
+
+//     if (nrf_power_event_get_and_clear(NRF_POWER, NRF_POWER_EVENT_USBREMOVED))
+//     {
+//         LOG("REMOVE");
+//         nrf_usbd_pullup_disable(NRF_USBD);
+//     }
+//     if (nrf_power_event_get_and_clear(NRF_POWER, NRF_POWER_EVENT_USBPWRRDY))
+//     {
+//         LOG("PWRREADY");
+//         nrf_usbd_pullup_enable(NRF_USBD);
+//     }
+// }
 
 void USBD_IRQHandler(void) {
 
-    const uint32_t enabled = nrf_usbd_int_enable_get(NRF_USBD);
-    uint32_t to_process = enabled;
-    uint32_t active = 0;
+    uint32_t enabled = nrf_usbd_int_enable_get(NRF_USBD);
 
-    /* Check all enabled interrupts */
-    while (to_process)
-    {
-        uint8_t event_nr = __CLZ(__RBIT(to_process));
-        if (nrf_usbd_event_get_and_clear(NRF_USBD,
-                                         (nrf_usbd_event_t)nrfx_bitpos_to_event(event_nr)))
+    uint32_t set = 0;
+
+    // walk inten and store active interrupts in set whilst clearing events.
+    for (int i = 0; i < 25; i++) {
+        if ((enabled & (1 << i)) && nrf_usbd_event_get_and_clear(NRF_USBD, (nrf_usbd_event_t)nrfx_bitpos_to_event(i)))
+            set |= 1 << i;
+    }
+
+    LOG("SET %x ENABLED %x",set,enabled);
+    
+    if (set & USBD_INTEN_USBRESET_Msk) {
+        LOG("RESET"); 
+        CodalUSB::usbInstance->initEndpoints();
+    }
+
+    if (set & USBD_INTEN_USBEVENT_Msk) {
+        uint32_t event = nrf_usbd_eventcause_get_and_clear(NRF_USBD);
+        LOG("usb event %d", event); 
+        // if (event & NRF_USBD_EVENTCAUSE_ISOOUTCRC_MASK);
+        if (event & NRF_USBD_EVENTCAUSE_SUSPEND_MASK)
         {
-            active |= 1UL << event_nr;
+            LOG("USB suspend"); 
         }
-        to_process &= ~(1UL << event_nr);
-    }
-
-    if (nrfx_usbd_errata_104())
-    {
-        /* Event correcting */
-        if (/*(!m_dma_pending) &&*/ (0 != (active & (USBD_INTEN_SOF_Msk))))
+        if (event & NRF_USBD_EVENTCAUSE_RESUME_MASK)
         {
-            uint8_t usbi, uoi, uii;
-            /* Testing */
-            *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7A9;
-            uii = (uint8_t)(*((volatile uint32_t *)(NRF_USBD_BASE + 0x804)));
-            if (0 != uii)
-            {
-                uii &= (uint8_t)(*((volatile uint32_t *)(NRF_USBD_BASE + 0x804)));
-            }
-
-            *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7AA;
-            uoi = (uint8_t)(*((volatile uint32_t *)(NRF_USBD_BASE + 0x804)));
-            if (0 != uoi)
-            {
-                uoi &= (uint8_t)(*((volatile uint32_t *)(NRF_USBD_BASE + 0x804)));
-            }
-            *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7AB;
-            usbi = (uint8_t)(*((volatile uint32_t *)(NRF_USBD_BASE + 0x804)));
-            if (0 != usbi)
-            {
-                usbi &= (uint8_t)(*((volatile uint32_t *)(NRF_USBD_BASE + 0x804)));
-            }
-            /* Processing */
-            *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7AC;
-            uii &= (uint8_t)*((volatile uint32_t *)(NRF_USBD_BASE + 0x804));
-            if (0 != uii)
-            {
-                uint8_t rb;
-                // m_simulated_dataepstatus |= ((uint32_t)uii) << NRFX_USBD_EPIN_BITPOS_0;
-                *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7A9;
-                *((volatile uint32_t *)(NRF_USBD_BASE + 0x804)) = uii;
-                rb = (uint8_t)*((volatile uint32_t *)(NRF_USBD_BASE + 0x804));
-                // NRFX_USBD_LOG_PROTO1_FIX_PRINTF("   uii: 0x%.2x (0x%.2x)", uii, rb);
-                (void)rb;
-            }
-
-            *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7AD;
-            uoi &= (uint8_t)*((volatile uint32_t *)(NRF_USBD_BASE + 0x804));
-            if (0 != uoi)
-            {
-                uint8_t rb;
-                // m_simulated_dataepstatus |= ((uint32_t)uoi) << NRFX_USBD_EPOUT_BITPOS_0;
-                *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7AA;
-                *((volatile uint32_t *)(NRF_USBD_BASE + 0x804)) = uoi;
-                rb = (uint8_t)*((volatile uint32_t *)(NRF_USBD_BASE + 0x804));
-                // NRFX_USBD_LOG_PROTO1_FIX_PRINTF("   uoi: 0x%.2u (0x%.2x)", uoi, rb);
-                (void)rb;
-            }
-
-            *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7AE;
-            usbi &= (uint8_t)*((volatile uint32_t *)(NRF_USBD_BASE + 0x804));
-            if (0 != usbi)
-            {
-                uint8_t rb;
-                if (usbi & 0x01)
-                {
-                    active |= USBD_INTEN_EP0SETUP_Msk;
-                }
-                if (usbi & 0x10)
-                {
-                    active |= USBD_INTEN_USBRESET_Msk;
-                }
-                *((volatile uint32_t *)(NRF_USBD_BASE + 0x800)) = 0x7AB;
-                *((volatile uint32_t *)(NRF_USBD_BASE + 0x804)) = usbi;
-                rb = (uint8_t)*((volatile uint32_t *)(NRF_USBD_BASE + 0x804));
-                // NRFX_USBD_LOG_PROTO1_FIX_PRINTF("   usbi: 0x%.2u (0x%.2x)", usbi, rb);
-                (void)rb;
-            }
-
-            // if (0 != (m_simulated_dataepstatus &
-            //     ~((1U << NRFX_USBD_EPOUT_BITPOS_0) | (1U << NRFX_USBD_EPIN_BITPOS_0))))
-            // {
-            //     active |= enabled & NRF_USBD_INT_DATAEP_MASK;
-            // }
-            // if (0 != (m_simulated_dataepstatus &
-            //     ((1U << NRFX_USBD_EPOUT_BITPOS_0) | (1U << NRFX_USBD_EPIN_BITPOS_0))))
-            // {
-            //     if (0 != (enabled & NRF_USBD_INT_EP0DATADONE_MASK))
-            //     {
-            //         m_simulated_dataepstatus &=
-            //             ~((1U << NRFX_USBD_EPOUT_BITPOS_0) | (1U << NRFX_USBD_EPIN_BITPOS_0));
-            //         active |= NRF_USBD_INT_EP0DATADONE_MASK;
-            //     }
-            // }
+            LOG("USB resume");
+        }
+        if (event & NRF_USBD_EVENTCAUSE_WUREQ_MASK)
+        {
+            LOG("USB wakeup");
+        }
+        if (event & NRF_USBD_EVENTCAUSE_READY_MASK)
+        {
+            LOG("USB READY");
         }
     }
 
-    /* Process the active interrupts */
-    bool setup_active = 0 != (active & NRF_USBD_INT_EP0SETUP_MASK);
-    active &= ~NRF_USBD_INT_EP0SETUP_MASK;
-    int32_t ep_interrupt = -1;
-    while (active)
-    {
-        uint8_t event_nr = __CLZ(__RBIT(active));
-        int32_t event = -1;
-        UsbEndpointOut* ep = NULL;
-
-        switch(event_nr) {
-            case USBD_INTEN_USBRESET_Pos:      /**< Reset condition on USB bus detected. */
-                LOG("RESET"); 
-                CodalUSB::usbInstance->initEndpoints();
-                break;
-            case USBD_INTEN_ENDEPOUT0_Pos:
-                ep = findOutEp(0);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 0);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_ENDEPOUT1_Pos:
-                ep = findOutEp(1);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 1);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_ENDEPOUT2_Pos:
-                ep = findOutEp(2);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 2);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_ENDEPOUT3_Pos:
-                ep = findOutEp(3);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 3);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_ENDEPOUT4_Pos:
-                ep = findOutEp(4);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 4);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_ENDEPOUT5_Pos:
-                ep = findOutEp(5);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 5);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_ENDEPOUT6_Pos:
-                ep = findOutEp(6);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 6);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_ENDEPOUT7_Pos:
-                ep = findOutEp(7);
-                ep->userdata = nrf_usbd_epout_size_get(NRF_USBD, 7);
-                ep_interrupt = 1;
-                break;
-            case USBD_INTEN_USBEVENT_Pos:
-                event = nrf_usbd_eventcause_get_and_clear(NRF_USBD);
-                // if (event & NRF_USBD_EVENTCAUSE_ISOOUTCRC_MASK);
-                if (event & NRF_USBD_EVENTCAUSE_SUSPEND_MASK)
-                {
-                    LOG("USB suspend"); 
-                }
-                if (event & NRF_USBD_EVENTCAUSE_RESUME_MASK)
-                {
-                    LOG("USB resume");
-                }
-                if (event & NRF_USBD_EVENTCAUSE_WUREQ_MASK)
-                {
-                    LOG("USB wakeup");
-                }
-                break;
-
-            case USBD_INTEN_STARTED_Pos:
-            case USBD_INTEN_ENDEPIN0_Pos:
-            case USBD_INTEN_ENDEPIN1_Pos:
-            case USBD_INTEN_ENDEPIN2_Pos:
-            case USBD_INTEN_ENDEPIN3_Pos:
-            case USBD_INTEN_ENDEPIN4_Pos:
-            case USBD_INTEN_ENDEPIN5_Pos:
-            case USBD_INTEN_ENDEPIN6_Pos:
-            case USBD_INTEN_ENDEPIN7_Pos:
-            case USBD_INTEN_EP0DATADONE_Pos:
-            case USBD_INTEN_ENDISOIN_Pos:
-            case USBD_INTEN_ENDISOOUT_Pos:
-            case USBD_INTEN_SOF_Pos:
-                break;
-        }
-
-        active &= ~(1UL << event_nr);
-    }
-
-    if (ep_interrupt)
-        CodalUSB::usbInstance->interruptHandler();
-
-
-    if (setup_active)
+    if (set & USBD_INTEN_EP0SETUP_Msk)
     {
         USBSetup stp;
         stp.bmRequestType = nrf_usbd_setup_bmrequesttype_get(NRF_USBD);
@@ -291,12 +186,21 @@ void USBD_IRQHandler(void) {
         CodalUSB::usbInstance->setupRequest(stp);
     }
 
-        // CodalUSB::usbInstance->interruptHandler();
+    int ep_read = 0;
+    for(int i = 1; i < DEVICE_USB_ENDPOINTS; i++)
+        if (set & (1 << (USBD_INTEN_ENDEPOUT0_Pos + i))) {
+            LOG("EP%d READ!", i);
+            ep_read = 1;
+        }
+    if (ep_read)
+        CodalUSB::usbInstance->interruptHandler();
 }
 
 void usb_configure(uint8_t numEndpoints)
 {
-    nrf_usbd_enable(NRF_USBD);
+    nrf_usbd_disable(NRF_USBD);
+
+    while(!nrf_power_usbregstatus_vbusdet_get(NRF_POWER));
 
     uint32_t intmsk =
        NRF_USBD_INT_USBRESET_MASK     |
@@ -314,10 +218,25 @@ void usb_configure(uint8_t numEndpoints)
 //    }
 
    /* Enable all required interrupts */
+    // nrf_power_int_enable(NRF_POWER, NRF_POWER_INT_USBDETECTED_MASK |
+    //                                 NRF_POWER_INT_USBREMOVED_MASK  |
+    //                                 NRF_POWER_INT_USBPWRRDY_MASK);
+    // NVIC_SetVector(POWER_CLOCK_IRQn, (uint32_t)POWER_CLOCK_IRQHandler);
+    // NVIC_SetPriority(POWER_CLOCK_IRQn, NRFX_POWER_DEFAULT_CONFIG_IRQ_PRIORITY);
+    // NVIC_EnableIRQ(POWER_CLOCK_IRQn);
+
+    nrf_usbd_enable(NRF_USBD);
+    nrf_clock_event_clear(NRF_CLOCK, NRF_CLOCK_EVENT_HFCLKSTARTED);
+    nrf_clock_task_trigger(NRF_CLOCK, NRF_CLOCK_TASK_HFCLKSTART);
     nrf_usbd_int_enable(NRF_USBD, intmsk);
-    nrf_usbd_pullup_enable(NRF_USBD);
+
+    nrf_usbd_event_get_and_clear(NRF_USBD, NRF_USBD_EVENT_USBEVENT);
+
+    NVIC_ClearPendingIRQ(USBD_IRQn);
     NVIC_SetPriority(USBD_IRQn, 7);
     NVIC_EnableIRQ(USBD_IRQn);
+
+    nrf_usbd_pullup_enable(NRF_USBD);
 }
 
 void usb_set_address(uint16_t wValue) {}
@@ -344,6 +263,7 @@ int UsbEndpointIn::clearStall()
     LOG("clear stall IN %d", ep);
 
     nrf_usbd_ep_unstall(NRF_USBD, (nrfx_usbd_ep_t)NRF_USBD_EP_NR_GET(ep));
+    nrf_usbd_dtoggle_set(NRF_USBD, (nrfx_usbd_ep_t)NRF_USBD_EP_NR_GET(ep), NRF_USBD_DTOGGLE_DATA0);
     wLength = 0;
     return DEVICE_OK;
 }
@@ -365,6 +285,7 @@ int UsbEndpointIn::stall()
     }
     else
         nrf_usbd_ep_stall(NRF_USBD, (nrfx_usbd_ep_t)NRF_USBD_EP_NR_GET(ep));
+    wLength = 0;
     return DEVICE_OK;
 }
 
@@ -391,7 +312,7 @@ UsbEndpointIn::UsbEndpointIn(uint8_t idx, uint8_t type, uint8_t size)
 {
     usb_assert(size == 64);
     usb_assert(type <= USB_EP_TYPE_INTERRUPT);
-    ep = idx | NRF_USBD_EP_DIR_IN;
+    ep = idx;
     flags = 0;
     userdata = 0;
 
@@ -425,16 +346,27 @@ int UsbEndpointOut::enableIRQ()
 
 void UsbEndpointOut::startRead()
 {
+    if (ep == 0) {
+        nrf_usbd_task_trigger(NRF_USBD, (nrf_usbd_task_t)NRF_USBD_TASK_EP0RCVOUT);
+    }
+    else 
+        NRF_USBD->SIZE.EPOUT[ep] = 0;
+
     nrf_usbd_ep_easydma_set(NRF_USBD, ep, (uint32_t)buf, USB_MAX_PKT_SIZE);
+    nrf_usbd_task_trigger(NRF_USBD, (nrf_usbd_task_t) (NRF_USBD_TASK_STARTEPOUT0 + NRF_USBD_EP_NR_GET(ep)));
     DBG("OUT %d start read", ep);
     while(!nrf_usbd_event_check(NRF_USBD, (nrf_usbd_event_t) (NRF_USBD_EVENT_ENDEPOUT0 + NRF_USBD_EP_NR_GET(ep))));
+
+    if (nrf_usbd_epout_size_get(NRF_USBD, ep) == 0 && ep == 0)
+        nrf_usbd_task_trigger(NRF_USBD, (nrf_usbd_task_t)NRF_USBD_TASK_EP0STATUS);
+    DBG("OUT %d end read %d bytes", ep, nrf_usbd_epout_size_get(NRF_USBD, ep));
 }
 
 int UsbEndpointOut::read(void *dst, int maxlen)
 {
     usb_assert(this != NULL);
 
-    int packetSize = userdata & 0xff;
+    int packetSize = nrf_usbd_epout_size_get(NRF_USBD, ep);
 
     if (packetSize)
     {
@@ -455,15 +387,18 @@ int UsbEndpointOut::read(void *dst, int maxlen)
 static void writeEP(uint8_t *data, uint8_t ep, int len)
 {
     usb_assert(len <= USB_MAX_PKT_SIZE);
-    uint32_t len32b = (len + 3) / 4;
 
-    nrf_usbd_ep_easydma_set(NRF_USBD, ep, (uint32_t)data, len32b);
-    DBG("write: %p len=%d at IN %d", data, len, ep);
+    
 
+    nrf_usbd_ep_easydma_set(NRF_USBD, ep | NRF_USBD_EP_DIR_IN, (uint32_t)data, len);
+    DBG("write: %p len=%d at IN %d", data, len, NRF_USBD_EP_NR_GET(ep));
+    for (int i =0 ;i<len; i++)
+        DBG("%x,",data[i]);
+    nrf_usbd_task_trigger(NRF_USBD, (nrf_usbd_task_t) (NRF_USBD_TASK_STARTEPIN0 + NRF_USBD_EP_NR_GET(ep)));
     while(!nrf_usbd_event_check(NRF_USBD, (nrf_usbd_event_t)(NRF_USBD_EVENT_ENDEPIN0 + NRF_USBD_EP_NR_GET(ep))));
 
     // there is a ZLP from the host coming
-    if (len && ep == 0)
+    if (len && NRF_USBD_EP_NR_GET(ep) == 0)
         CodalUSB::usbInstance->ctrlOut->startRead();
 }
 
@@ -478,6 +413,7 @@ int UsbEndpointIn::write(const void *src, int len)
 
     if (wLength)
     {
+        DBG("WLENGTH SET %d", wLength);
         if (len >= wLength)
         {
             len = wLength;
