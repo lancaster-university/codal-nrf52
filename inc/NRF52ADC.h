@@ -169,12 +169,6 @@ public:
     * @param oversample the number of samples to aggregate in sofware into a final result.
     */
     void demux(ManagedBuffer dmaBuffer, int offset, int skip, int oversample);
-
-    /**
-     * IRQ callback to activate/deactivate a pending channel
-     * @return 1 if this channel changes status, ero otherwise.
-     */
-    int servicePendingRequests(bool adcRunning);
 };
 
 #define NRF52ADC_STATUS_PERIOD_CHANGED              0x01        // Indicates that the period of the ADC may have changed.
@@ -192,7 +186,7 @@ public:
     NRF52ADCChannel     channels[NRF52_ADC_CHANNELS];           // ADC channel objects
     ManagedBuffer       dma[2];                                 // Double buffered DMA receive buffers.
     int                 softwareOversample;                     // The level of software oversampling level in use.
-
+    volatile bool       running;
    
 public:
     /**
@@ -283,6 +277,26 @@ public:
      */
     int releaseChannel(Pin& pin);
 
+private:
+    /**
+     * Stop the ADC running, if it is running.
+     * 
+     * @return true if it was running.
+     */
+    bool stopRunning();
+
+    /**
+     * Start the ADC running, if stopped and at least one channel is enabled.
+     *
+     * @return true if it is running.
+     */
+    bool startRunning();
+
+    /**
+     * Set samplerate and calculate oversampling values.
+     *
+     */
+    void configureSampling();
 };
 
 #endif
