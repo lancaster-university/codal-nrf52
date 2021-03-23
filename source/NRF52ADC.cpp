@@ -688,6 +688,8 @@ bool NRF52ADC::stopRunning()
     //Disable PPI links
     NRF_PPI->CHENCLR = 3;
 
+    while ( NRF_SAADC->STATUS & 1) /*wait for not busy*/;
+
     NRF_SAADC->TASKS_STOP = 1;
     while ( running) /*wait for stop*/;
 
