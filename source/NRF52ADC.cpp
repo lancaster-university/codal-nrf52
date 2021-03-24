@@ -704,6 +704,22 @@ bool NRF52ADC::startRunning()
     if ( running)
         return true;
 
+    volatile uint32_t temp1;
+    volatile uint32_t temp2;
+    volatile uint32_t temp3;
+
+    temp1 = *(volatile uint32_t *)0x40007640ul;
+    temp2 = *(volatile uint32_t *)0x40007644ul;
+    temp3 = *(volatile uint32_t *)0x40007648ul;
+
+    *(volatile uint32_t *)0x40007FFCul = 0ul; 
+    *(volatile uint32_t *)0x40007FFCul; 
+    *(volatile uint32_t *)0x40007FFCul = 1ul;
+
+    *(volatile uint32_t *)0x40007640ul = temp1;
+    *(volatile uint32_t *)0x40007644ul = temp2;
+    *(volatile uint32_t *)0x40007648ul = temp3;
+
     NRF_SAADC->ENABLE = 0;
 
     // Configure channels
@@ -716,6 +732,7 @@ bool NRF52ADC::startRunning()
             enabledChannels++;
             NRF_SAADC->CH[channel].PSELP = channel+1;
             NRF_SAADC->CH[channel].PSELN = 0;
+            channels[channel].setGain();
         }
         else
         {
@@ -731,6 +748,14 @@ bool NRF52ADC::startRunning()
     }
 
     NRF_SAADC->ENABLE = 1;
+
+    // Enable 14 bit sampling (although it's rather nicely delivered as a 16 bit sample).
+    NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_14bit << SAADC_RESOLUTION_VAL_Pos);
+
+    // Configure for an interrupt on ND and STOP events.
+    NRF_SAADC->INTENSET = (SAADC_INTENSET_STARTED_Enabled << SAADC_INTENSET_STARTED_Pos) |
+        (SAADC_INTENSET_END_Enabled << SAADC_INTENSET_END_Pos) |
+        (SAADC_INTENSET_STOPPED_Enabled << SAADC_INTENSET_STOPPED_Pos );
 
     // Recalculate DMA buffer size, ensure the our target DMA buffer sample count is a multiple of the channel count.
     // Recalculate OVERSAMPLE and timer settings accordingly.
