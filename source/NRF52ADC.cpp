@@ -68,7 +68,8 @@ NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), out
     this->channel = channel;
     this->size = buffer.length();
     this->bufferSize = NRF52_ADC_DMA_SIZE;
-    this->setGain();
+    this->gain = 2;
+    this->bias = 0;
     this->status = 0;
     this->lastSample = 0;
 
@@ -188,8 +189,6 @@ uint16_t NRF52ADCChannel::getSample()
     // Account for multiplexed offset
     ptr += offset;
 
-    //DMESG("NRF52ADCChannel::getSample channel %d skip %d offset %d ptr %x end %x", channel, skip, offset, (uint32_t)ptr, (uint32_t)end);
-
     // Find the last entry in the buffer that's been written for this channel
     if (*ptr != 0x8888)
     {
@@ -207,7 +206,6 @@ uint16_t NRF52ADCChannel::getSample()
     if (sample < 0)
         sample = 0;
 
-    //DMESG("NRF52ADCChannel::getSample ptr %x *ptr %d sample %d lastSample %d", (uint32_t)ptr, (int) *((int16_t *) ptr), (int) sample, (int) lastSample);
     return (uint16_t) sample;
 }
 
@@ -238,20 +236,32 @@ int NRF52ADCChannel::setGain(int gain, int bias)
     if (gain < 0 || gain > 7 || bias < 0 || bias > 3)
         return DEVICE_INVALID_PARAMETER;
 
-    // Update settings in the SAADC.
-    
-    NRF_SAADC->CH[channel].CONFIG = (bias << SAADC_CH_CONFIG_RESP_Pos) |
-        (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
-        (gain << SAADC_CH_CONFIG_GAIN_Pos) |
-        (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
-        (SAADC_CH_CONFIG_TACQ_3us << SAADC_CH_CONFIG_TACQ_Pos) |
-        (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
+    this->gain = gain;
+    this->bias = bias;
 
-
-    // inidcate that the ADC should be cycled at the next opportunity to start using the new settings
-    status |= NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED;
+    // TODO: Consider cycling the ADC
 
     return DEVICE_OK;
+}
+
+/**
+  * Determine the gain level for the analog input.
+  *
+  * @return The gain.
+  */
+int NRF52ADCChannel::getGain()
+{
+    return gain;
+}
+
+/**
+  * Determine the bias for the analog input.
+  *
+  * @return The bias.
+  */
+int NRF52ADCChannel::getBias()
+{
+    return bias;
 }
 
 /**
@@ -643,7 +653,6 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
 
     if (!channels[c].isEnabled())
     {
-        //DMESGF("NRF52ADC::getChannel %d", c);
         stopRunning();
         channels[c].enable();
         startRunning();
@@ -668,7 +677,6 @@ int NRF52ADC::releaseChannel(Pin& pin)
 
     if (channels[c].isEnabled())
     {
-        //DMESGF("NRF52ADC::releaseChannel %d", c);
         bool wasRunning = stopRunning();
         channels[c].disable();
         if (wasRunning)
@@ -677,11 +685,8 @@ int NRF52ADC::releaseChannel(Pin& pin)
     return DEVICE_OK;
 }
 
-
 bool NRF52ADC::stopRunning()
 {
-    //DMESGF("NRF52ADC::stopRunning running = %d", running ? 1 : 0);
-
     if ( !running)
       return false;
 
@@ -699,11 +704,10 @@ bool NRF52ADC::stopRunning()
 
 bool NRF52ADC::startRunning()
 {
-    //DMESGF("NRF52ADC::startRunning running = %d", running ? 1 : 0);
-
     if ( running)
         return true;
 
+    // https://infocenter.nordicsemi.com/topic/errata_nRF52833_Rev1/ERR/nRF52833/Rev1/latest/anomaly_833_212.html
     volatile uint32_t temp1;
     volatile uint32_t temp2;
     volatile uint32_t temp3;
@@ -722,6 +726,14 @@ bool NRF52ADC::startRunning()
 
     NRF_SAADC->ENABLE = 0;
 
+    // Enable 14 bit sampling (although it's rather nicely delivered as a 16 bit sample).
+    NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_14bit << SAADC_RESOLUTION_VAL_Pos);
+
+    // Configure for an interrupt on STARTED, END and STOP events.
+    NRF_SAADC->INTENSET = (SAADC_INTENSET_STARTED_Enabled << SAADC_INTENSET_STARTED_Pos) |
+        (SAADC_INTENSET_END_Enabled << SAADC_INTENSET_END_Pos) |
+        (SAADC_INTENSET_STOPPED_Enabled << SAADC_INTENSET_STOPPED_Pos );
+
     // Configure channels
     enabledChannels = 0;
             
@@ -730,9 +742,17 @@ bool NRF52ADC::startRunning()
         if ( channels[channel].isEnabled())
         {
             enabledChannels++;
+
+            // Configure the gain and bias, as set by NRF52ADCChannel::setGain()
+            NRF_SAADC->CH[channel].CONFIG = (channels[channel].getBias() << SAADC_CH_CONFIG_RESP_Pos) |
+                (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
+                (channels[channel].getGain() << SAADC_CH_CONFIG_GAIN_Pos) |
+                (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
+                (SAADC_CH_CONFIG_TACQ_3us << SAADC_CH_CONFIG_TACQ_Pos) |
+                (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
+
             NRF_SAADC->CH[channel].PSELP = channel+1;
             NRF_SAADC->CH[channel].PSELN = 0;
-            channels[channel].setGain();
         }
         else
         {
@@ -748,14 +768,6 @@ bool NRF52ADC::startRunning()
     }
 
     NRF_SAADC->ENABLE = 1;
-
-    // Enable 14 bit sampling (although it's rather nicely delivered as a 16 bit sample).
-    NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_14bit << SAADC_RESOLUTION_VAL_Pos);
-
-    // Configure for an interrupt on ND and STOP events.
-    NRF_SAADC->INTENSET = (SAADC_INTENSET_STARTED_Enabled << SAADC_INTENSET_STARTED_Pos) |
-        (SAADC_INTENSET_END_Enabled << SAADC_INTENSET_END_Pos) |
-        (SAADC_INTENSET_STOPPED_Enabled << SAADC_INTENSET_STOPPED_Pos );
 
     // Recalculate DMA buffer size, ensure the our target DMA buffer sample count is a multiple of the channel count.
     // Recalculate OVERSAMPLE and timer settings accordingly.
@@ -778,4 +790,3 @@ bool NRF52ADC::startRunning()
 
     return true;
 }
-
