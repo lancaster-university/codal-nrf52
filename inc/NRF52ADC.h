@@ -48,10 +48,6 @@ using namespace codal;
 //
 // NRF52ADCChannel status codes
 //
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE           0x01
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE          0x02
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE           0x04
-#define NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED         0x08
 #define NRF52_ADC_CHANNEL_STATUS_ENABLED                0x10
 #define NRF52_ADC_CHANNEL_STATUS_CONNECTED              0x20
 
@@ -68,6 +64,8 @@ private:
     int16_t             bufferSize;
     volatile uint8_t    status;
     uint8_t             channel;
+    uint8_t             gain;
+    uint8_t             bias;
  
 public:
     DataStream      output;
@@ -159,6 +157,20 @@ public:
      * 3: Activate pull to VDD/2
      */
     int setGain(int gain = 2, int bias = 0);
+
+    /**
+     * Determine the gain level for the analog input.
+     *
+     * @return The gain.
+     */
+    int getGain();
+
+    /**
+     * Determine the bias for the analog input.
+     *
+     * @return The bias.
+     */
+    int getBias();
     
     /**
     * Demultiplexes the current DMA output buffer into the buffer of this channel.
