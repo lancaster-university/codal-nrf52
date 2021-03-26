@@ -209,8 +209,6 @@ int NRF52Serial::setBaudrate(uint32_t baudrate)
 
 int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 {
-    this->tx = tx;
-    this->rx = rx;
     nrf_uarte_txrx_pins_set(p_uarte_, tx.name, rx.name);
       
     return DEVICE_OK;
