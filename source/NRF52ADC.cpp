@@ -236,10 +236,13 @@ int NRF52ADCChannel::setGain(int gain, int bias)
     if (gain < 0 || gain > 7 || bias < 0 || bias > 3)
         return DEVICE_INVALID_PARAMETER;
 
+    bool wasRunning = adc.stopRunning();
+
     this->gain = gain;
     this->bias = bias;
 
-    // TODO: Consider cycling the ADC
+    if (wasRunning)
+      adc.startRunning();
 
     return DEVICE_OK;
 }

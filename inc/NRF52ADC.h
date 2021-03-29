@@ -289,7 +289,6 @@ public:
      */
     int releaseChannel(Pin& pin);
 
-private:
     /**
      * Stop the ADC running, if it is running.
      * 
@@ -304,6 +303,7 @@ private:
      */
     bool startRunning();
 
+private:
     /**
      * Set samplerate and calculate oversampling values.
      *
