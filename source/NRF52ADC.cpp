@@ -239,9 +239,23 @@ int NRF52ADCChannel::setGain(int gain, int bias)
     this->gain = gain;
     this->bias = bias;
 
-    // TODO: Consider cycling the ADC
+    configureGain();
 
     return DEVICE_OK;
+}
+
+/**
+ * Configure the gain level and the resistor bias.
+ *
+ */
+void NRF52ADCChannel::configureGain()
+{
+    NRF_SAADC->CH[channel].CONFIG = (bias << SAADC_CH_CONFIG_RESP_Pos) |
+        (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
+        (gain << SAADC_CH_CONFIG_GAIN_Pos) |
+        (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
+        (SAADC_CH_CONFIG_TACQ_3us << SAADC_CH_CONFIG_TACQ_Pos) |
+        (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
 }
 
 /**
@@ -743,13 +757,7 @@ bool NRF52ADC::startRunning()
         {
             enabledChannels++;
 
-            // Configure the gain and bias, as set by NRF52ADCChannel::setGain()
-            NRF_SAADC->CH[channel].CONFIG = (channels[channel].getBias() << SAADC_CH_CONFIG_RESP_Pos) |
-                (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
-                (channels[channel].getGain() << SAADC_CH_CONFIG_GAIN_Pos) |
-                (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
-                (SAADC_CH_CONFIG_TACQ_3us << SAADC_CH_CONFIG_TACQ_Pos) |
-                (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
+            channels[channel].configureGain();
 
             NRF_SAADC->CH[channel].PSELP = channel+1;
             NRF_SAADC->CH[channel].PSELN = 0;
