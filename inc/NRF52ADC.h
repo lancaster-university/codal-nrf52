@@ -171,6 +171,12 @@ public:
      * @return The bias.
      */
     int getBias();
+
+    /**
+     * Configure the gain level and the resistor bias.
+     *
+     */
+    void configureGain();
     
     /**
     * Demultiplexes the current DMA output buffer into the buffer of this channel.
