@@ -50,8 +50,6 @@ using namespace codal;
 #define NUM_PINS 32
 #endif
 
-volatile uint32_t interrupt_enable = 0;
-
 static NRF52Pin *irq_pins[NUM_PINS];
 
 MemorySource* NRF52Pin::pwmSource = NULL;
@@ -66,38 +64,61 @@ TouchSensor* NRF52Pin::touchSensor = NULL;
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+static void process_gpio_irq(NRF_GPIO_Type* GPIO_PORT, int pinNumberOffset)
+{
+    uint32_t    pinNumber;
+    uint32_t    latch;
+    NRF52Pin    *pin;
+
+    // Take a snapshot of the latched values.
+    latch = GPIO_PORT->LATCH;
+
+    // Handle any events raised on this port.
+    while(latch)
+    {
+        // Determine the most significant pin that has changed.
+        asm("mov r11, #31              \r\n"
+            "clz r12, %[value]         \r\n"
+            "sub %[result], r11, r12   \r\n"
+
+                : [result] "=r" (pinNumber)
+                : [value] "r" (latch)
+                : "r11", "r12", "cc"
+        );
+
+        // Record that we have received this change event
+        latch &= ~(1 << pinNumber);
+
+        // Determine the NRF52Pin associated with this IRQ event
+        pin = irq_pins[pinNumber + pinNumberOffset];
+
+        // If that pin is registered for edge events
+        if (pin && (pin->status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
+        {
+            // Flip the sense bit of this pin to the opposite polarity (to sense the next edge)
+            GPIO_PORT->PIN_CNF[pinNumber] ^= 0x00010000;
+
+            // Invoke rise/fall handler in the pin according to the sensed polarity of this event
+            if (GPIO_PORT->PIN_CNF[pinNumber] & 0x00010000)
+                pin->rise();
+            else
+                pin->fall();
+        }
+    }
+
+    GPIO_PORT->LATCH = 0xffffffff;
+}
+
 void GPIOTE_IRQHandler(void)
 {
     if (NRF_GPIOTE->EVENTS_PORT)
     {
+        // Acknowledge the interrupt
         NRF_GPIOTE->EVENTS_PORT = 0;
-        for (uint8_t i = 0; i <= 31; i++)
-        {
-            if (interrupt_enable & (1 << i) && irq_pins[i] && NRF_P0->LATCH & (1 << i))
-            {
-                uint32_t currCnf = NRF_P0->PIN_CNF[i];
-                uint8_t currSense = (currCnf & GPIO_PIN_CNF_SENSE_Msk) >> GPIO_PIN_CNF_SENSE_Pos;
 
-                // hi: latch indicates a state change... determine if we were looking for hi or lo.
-                if (currSense == GPIO_PIN_CNF_SENSE_High)
-                {
-                    // swap!
-                    NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
-                    irq_pins[i]->rise();
-                }
-                else
-                {
-                    // swap!
-                    NRF_P0->PIN_CNF[i] = (currCnf & ~GPIO_PIN_CNF_SENSE_Msk) | (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
-                    irq_pins[i]->fall();
-                }
-            }
-        }
-        // make sure to clear everything
-        NRF_P0->LATCH = 0xffffffff;
-#ifdef NRF_P1
-        NRF_P1->LATCH = 0xffffffff;
-#endif
+        process_gpio_irq(NRF_P0, 0);
+        process_gpio_irq(NRF_P1, 32);
     }
 }
 
@@ -185,7 +206,6 @@ void NRF52Pin::disconnect()
     {
         // disconnect pin cng
         PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
-        interrupt_enable &= ~(1 << this->name);
     }
 
     // Reset status flags to zero, but retain preferred TouchSense and Polarity mode.
@@ -270,6 +290,9 @@ int NRF52Pin::getDigitalValue()
     // Record our mode, so we can optimise later.
     status |= IO_STATUS_DIGITAL_IN;
 
+    // Ensure the current pull up/down configuration for this pin is applied.
+    setPull(pullMode);
+
     // return the current state of the pin
     return (PORT->IN & (1 << PIN)) ? 1 : 0;
 }
@@ -277,14 +300,14 @@ int NRF52Pin::getDigitalValue()
 /**
  * Configures this IO pin as a digital input with the specified internal pull-up/pull-down configuraiton (if necessary) and tests its current value.
  *
- * @param pull one of the mbed pull configurations: PullUp, PullDown, PullNone
+ * @param pull one of the pull configurations: PullMode::Up, PullMode::Down, or PullMode::None.
  *
  * @return 1 if this input is high, 0 if input is LO, or DEVICE_NOT_SUPPORTED
  *         if the given pin does not have digital capability.
  *
  * @code
  * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
- * P0.getDigitalValue(PullUp); // P0 is either 0 or 1;
+ * P0.getDigitalValue(PullMode::Up); 
  * @endcode
  */
 int NRF52Pin::getDigitalValue(PullMode pull)
@@ -667,7 +690,7 @@ int NRF52Pin::getAnalogPeriod()
 /**
   * Configures the pull of this pin.
   *
-  * @param pull one of the mbed pull configurations: PullUp, PullDown, PullNone
+  * @param pull one of the pull configurations: PullMode::Up, PullMode::Down, or PullMode::None.
   *
   * @return DEVICE_NOT_SUPPORTED if the current pin configuration is anything other
   *         than a digital input, otherwise DEVICE_OK.
@@ -721,7 +744,7 @@ void NRF52Pin::rise()
         pulseWidthEvent(DEVICE_PIN_EVT_PULSE_LO);
 
     if(status & IO_STATUS_EVENT_ON_EDGE)
-        Event(id, DEVICE_PIN_EVT_RISE, 0);
+        Event(id, DEVICE_PIN_EVT_RISE);
 
     if (status & IO_STATUS_INTERRUPT_ON_EDGE && gpio_irq)
         this->gpio_irq(1);
@@ -733,7 +756,7 @@ void NRF52Pin::fall()
         pulseWidthEvent(DEVICE_PIN_EVT_PULSE_HI);
 
     if(status & IO_STATUS_EVENT_ON_EDGE)
-        Event(id, DEVICE_PIN_EVT_FALL, 0);
+        Event(id, DEVICE_PIN_EVT_FALL);
 
     if (status & IO_STATUS_INTERRUPT_ON_EDGE && gpio_irq)
         this->gpio_irq(0);
@@ -750,12 +773,12 @@ void NRF52Pin::fall()
   */
 int NRF52Pin::enableRiseFallEvents(int eventType)
 {
-    bool enabled = false;
+    bool enablePulseIn = false;
 
     // if we are in neither of the two modes, configure pin as a TimedInterruptIn.
     if (!(status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
     {
-        int v = getDigitalValue(pullMode);
+        int v = getDigitalValue();
 
         // PORT->DETECTMODE = 1; // latched-detect
 
@@ -766,12 +789,20 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
             PORT->PIN_CNF[PIN] |= (GPIO_PIN_CNF_SENSE_High << GPIO_PIN_CNF_SENSE_Pos);
 
         PORT->LATCH = 1 << PIN; // clear any pending latch
-
-        // configure as interrupt in
-        interrupt_enable |= (1 << this->name);
-        enabled = true;
     }
 
+    // If we are moving into a PULSE_ON_EDGE mode record that we need to start a pulse detector object
+    if (!(status & IO_STATUS_EVENT_PULSE_ON_EDGE) && eventType == DEVICE_PIN_EVENT_ON_PULSE)
+        enablePulseIn = true;
+
+    // If we're moving out of pulse on edge mode (into plain edge detect mode), turn stop the pulse detecor.
+    if ((status & IO_STATUS_EVENT_PULSE_ON_EDGE) && eventType != DEVICE_PIN_EVENT_ON_PULSE)
+    {
+        delete ((PulseIn *)obj);
+        obj = NULL;
+    }
+
+    // Clear all state related to edge/pulse detection
     status &= ~(IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE);
 
     // set our status bits accordingly.
@@ -782,7 +813,7 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     else if(eventType == DEVICE_PIN_INTERRUPT_ON_EDGE)
         status |= IO_STATUS_INTERRUPT_ON_EDGE;
 
-    if (enabled && eventType == DEVICE_PIN_EVENT_ON_PULSE)
+    if (enablePulseIn)
     {
         // Create a new object to track pulse timing data.
         // Set the initial pulse edge to the current time in case the line is currently active.

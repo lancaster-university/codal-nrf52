@@ -97,11 +97,11 @@ void NRF52Serial::_irqHandler(void *self_)
     NRF52Serial *self = (NRF52Serial *)self_;
     NRF_UARTE_Type *p_uarte = self->p_uarte_;
 
-    while (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXDRDY)){
+    while (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXDRDY) && self->bytesProcessed < CONFIG_SERIAL_DMA_BUFFER_SIZE){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_RXDRDY);
         self->dataReceivedDMA();
     }
-    
+
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDRX)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDRX);
         self->updateRxBufferAfterENDRX();
@@ -110,19 +110,15 @@ void NRF52Serial::_irqHandler(void *self_)
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXSTARTED)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_RXSTARTED);
         self->updateRxBufferAfterRXSTARTED();
+    }
 
-    }else if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ERROR)){
+    if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ERROR)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ERROR);
         nrf_uarte_errorsrc_get_and_clear(p_uarte);
     }
 
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_RXTO)){
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_RXTO);
-        // nrf_uarte_task_trigger(p_uarte, NRF_UARTE_TASK_FLUSHRX);
-        uint32_t rx_cnt = nrf_uarte_rx_amount_get(p_uarte);
-        while(rx_cnt-- > 0){
-            self->dataReceivedDMA();
-        }
     }
 
     if (nrf_uarte_event_check(p_uarte, NRF_UARTE_EVENT_ENDTX)){
@@ -153,6 +149,7 @@ int NRF52Serial::enableInterrupt(SerialInterruptType t)
 
         if(status & CODAL_SERIAL_STATUS_RX_BUFF_INIT){
             nrf_uarte_rx_buffer_set(p_uarte_, dmaBuffer, CONFIG_SERIAL_DMA_BUFFER_SIZE);
+            bytesProcessed = 0;
             nrf_uarte_int_enable(p_uarte_, NRF_UARTE_INT_ERROR_MASK |
                                             NRF_UARTE_INT_ENDRX_MASK);
             nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STARTRX);
@@ -270,13 +267,23 @@ void NRF52Serial::dataReceivedDMA()
 
 void NRF52Serial::updateRxBufferAfterENDRX()
 {
+    // A DMA transfer has been completed.
+    // Determine the number of bytes the UART hardware sucessfuly transferred.
+    // This is normally the size of the DMA buffer, but may be shorter if any exceptions occurred.
     int rxBytes = nrf_uarte_rx_amount_get(p_uarte_);
-    int rx_cnt = rxBytes - bytesProcessed;
 
-    // If we've dropped any interrupts, recover by processing and missed characters.
-    while(rx_cnt--)
+    // Occasionally we may detect an ENDRX event before the RXRDY associated with the last byte in the DMA buffer..
+    // Clear the RXRDY event if we still have outstanding bytes to process - this protects against us accedentally
+    // processing the same byte twice.
+    if (bytesProcessed < rxBytes)
+        nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_RXDRDY);
+
+    // Flush any unprocessed bytes in the DMA buffer.
+    while (bytesProcessed < rxBytes)
         dataReceivedDMA();
 
+    // Reset received byte counter, as we have completed processing the last DMA buffer
+    // and will have started receiving into a new DMA buffer.
     bytesProcessed = 0;
 }
 

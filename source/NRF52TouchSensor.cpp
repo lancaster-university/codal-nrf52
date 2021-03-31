@@ -77,6 +77,10 @@ NRF52TouchSensor::addTouchButton(TouchButton *button)
     TouchSensor::addTouchButton(button);
     button->_pin.setDigitalValue(0);
 
+    // If we've just added the first button, ensure the timer is reset.
+    if (numberOfButtons == 1)
+        timer.reset();
+
     return DEVICE_OK;
 }
 
