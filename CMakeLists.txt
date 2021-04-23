@@ -28,6 +28,7 @@ list(APPEND INCLUDE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/templates/"
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/templates/${TEMPLATE}"
     "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/drivers/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/nrfx/drivers/src"
 )
 
 list(APPEND SOURCE_FILES "asm/CortexContextSwitch.s")
