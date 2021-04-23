@@ -78,15 +78,12 @@ static UsbEndpointOut *findOutEp(int ep)
 }
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-void POWER_CLOCK_IRQHandler() {
+extern "C" void POWER_CLOCK_IRQHandler() {
     LOG("PCIRQ");
     if (nrf_power_event_get_and_clear(NRF_POWER, NRF_POWER_EVENT_USBDETECTED))
     {
-        Event(CodalUSB::usbInstance->id, USB_EVT_DETECTED);
+        Event(CodalUSB::usbInstance->id, USB_EVT_CONNECTED);
         LOG("DETECT");
         if (NRF_USBD->ENABLE == 0)
         {
@@ -196,7 +193,7 @@ void POWER_CLOCK_IRQHandler() {
     }
 }
 
-void USBD_IRQHandler(void) {
+extern "C" void USBD_IRQHandler(void) {
 
     uint32_t enabled = nrf_usbd_int_enable_get(NRF_USBD);
 
@@ -261,9 +258,6 @@ void USBD_IRQHandler(void) {
     if (ep_read)
         CodalUSB::usbInstance->interruptHandler();
 }
-#ifdef __cplusplus
-}
-#endif
 
 void usb_configure(uint8_t numEndpoints)
 {
