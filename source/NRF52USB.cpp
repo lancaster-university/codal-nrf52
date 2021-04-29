@@ -78,7 +78,7 @@ static UsbEndpointOut *findOutEp(int ep)
     return NULL;
 }
 
-inline void usb_pwr_detected() 
+inline void usb_pwr_detected()
 {
     LOG("DETECT");
     if (NRF_USBD->ENABLE == 0)
@@ -118,7 +118,7 @@ inline void usb_pwr_detected()
     Event(CodalUSB::usbInstance->id, USB_EVT_CONNECTED);
 }
 
-inline void usb_pwr_ready() 
+inline void usb_pwr_ready()
 {
     LOG("PWRREADY");
     NRF_USBD->EVENTCAUSE = USBD_EVENTCAUSE_READY_Msk;
@@ -202,6 +202,8 @@ extern "C" void POWER_CLOCK_IRQHandler() {
     }
 }
 
+static volatile uint32_t ep_status = 0;
+
 extern "C" void USBD_IRQHandler(void) {
 
     uint32_t enabled = nrf_usbd_int_enable_get(NRF_USBD);
@@ -260,12 +262,12 @@ extern "C" void USBD_IRQHandler(void) {
 
     if (set & USBD_INTEN_EPDATA_Msk)
     {
-        uint32_t status = NRF_USBD->EPDATASTATUS;
-        NRF_USBD->EPDATASTATUS = status;
+        ep_status = NRF_USBD->EPDATASTATUS;
+        NRF_USBD->EPDATASTATUS = ep_status;
 
-        LOG("EPDATASTATUS %d",status);
+        LOG("EPDATASTATUS %d",ep_status);
 
-        if (status & 0xff0000)
+        if (ep_status & 0xff0000)
         {
             LOG("EP READ!");
             CodalUSB::usbInstance->interruptHandler();
@@ -289,9 +291,9 @@ void usb_configure(uint8_t numEndpoints)
 
     uint32_t status = NRF_POWER->USBREGSTATUS;
 
-    if (nrf_power_usbregstatus_vbusdet_get(NRF_POWER)) 
+    if (nrf_power_usbregstatus_vbusdet_get(NRF_POWER))
         usb_pwr_detected();
-    if (nrf_power_usbregstatus_outrdy_get(NRF_POWER)) 
+    if (nrf_power_usbregstatus_outrdy_get(NRF_POWER))
         usb_pwr_ready();
 }
 
@@ -398,14 +400,18 @@ int UsbEndpointOut::enableIRQ()
 
 void UsbEndpointOut::startRead()
 {
-    NRF_USBD->SIZE.EPOUT[ep] = 0;
+    // indicate we're ready to go!
     NRF_USBD->EPOUT[ep].PTR    = (uint32_t) buf;
     NRF_USBD->EPOUT[ep].MAXCNT = USB_MAX_PKT_SIZE;
+    NRF_USBD->SIZE.EPOUT[ep] = 0;
 }
 
 int UsbEndpointOut::read(void *dst, int maxlen)
 {
     usb_assert(this != NULL);
+
+    if (ep != 0 && !(ep_status & (USBD_EPDATASTATUS_EPOUT1_Msk << (ep - 1))))
+        return 0;
 
     NRF_USBD->EVENTS_ENDEPOUT[ep] = 0;
     NRF_USBD->TASKS_STARTEPOUT[ep] = 1;
@@ -434,7 +440,6 @@ static int writeEP(UsbEndpointIn* endpoint, uint8_t *data, int len)
     usb_assert(len <= USB_MAX_PKT_SIZE);
     NRF_USBD->EPIN[endpoint->ep].PTR    = (uint32_t) data;
     NRF_USBD->EPIN[endpoint->ep].MAXCNT = len;
-
 
     NRF_USBD->EVENTS_EP0DATADONE = 0;
     NRF_USBD->EVENTS_EPDATA = 0;
