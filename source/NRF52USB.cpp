@@ -80,7 +80,7 @@ static UsbEndpointOut *findOutEp(int ep)
 
 inline void usb_pwr_detected() 
 {
-    DMESG("DETECT");
+    LOG("DETECT");
     if (NRF_USBD->ENABLE == 0)
     {
         NRF_USBD->EVENTCAUSE = USBD_EVENTCAUSE_READY_Msk;
@@ -120,7 +120,7 @@ inline void usb_pwr_detected()
 
 inline void usb_pwr_ready() 
 {
-    DMESG("PWRREADY");
+    LOG("PWRREADY");
     NRF_USBD->EVENTCAUSE = USBD_EVENTCAUSE_READY_Msk;
     if ( nrfx_usbd_errata_187() )
     {
@@ -180,7 +180,7 @@ inline void usb_pwr_ready()
 }
 
 extern "C" void POWER_CLOCK_IRQHandler() {
-    DMESG("PCIRQ");
+    LOG("PCIRQ");
     if (nrf_power_event_get_and_clear(NRF_POWER, NRF_POWER_EVENT_USBDETECTED))
     {
         usb_pwr_detected();
@@ -188,7 +188,7 @@ extern "C" void POWER_CLOCK_IRQHandler() {
 
     if (nrf_power_event_get_and_clear(NRF_POWER, NRF_POWER_EVENT_USBREMOVED))
     {
-        DMESG("REMOVE");
+        LOG("REMOVE");
         NRF_USBD->USBPULLUP = 0;
         NVIC_DisableIRQ(USBD_IRQn);
         NRF_USBD->INTENCLR = NRF_USBD->INTEN;
@@ -214,7 +214,7 @@ extern "C" void USBD_IRQHandler(void) {
             set |= 1 << i;
     }
 
-    DMESG("SET %x ENABLED %x",set,enabled);
+    LOG("SET %x ENABLED %x",set,enabled);
 
     if (set & USBD_INTEN_USBRESET_Msk) {
         LOG("RESET");
@@ -263,11 +263,11 @@ extern "C" void USBD_IRQHandler(void) {
         uint32_t status = NRF_USBD->EPDATASTATUS;
         NRF_USBD->EPDATASTATUS = status;
 
-        DMESG("EPDATASTATUS %d",status);
+        LOG("EPDATASTATUS %d",status);
 
         if (status & 0xff0000)
         {
-            DMESG("EP READ!");
+            LOG("EP READ!");
             CodalUSB::usbInstance->interruptHandler();
         }
     }
@@ -308,7 +308,6 @@ void usb_set_address_pre(uint16_t wValue)
 int UsbEndpointIn::clearStall()
 {
     LOG("clear stall IN %d", ep);
-
     nrf_usbd_ep_unstall(NRF_USBD, (nrfx_usbd_ep_t)(ep | NRF_USBD_EP_DIR_IN));
     nrf_usbd_dtoggle_set(NRF_USBD, (nrfx_usbd_ep_t)(ep | NRF_USBD_EP_DIR_IN), NRF_USBD_DTOGGLE_DATA0);
     wLength = 0;
@@ -381,7 +380,8 @@ UsbEndpointOut::UsbEndpointOut(uint8_t idx, uint8_t type, uint8_t size)
     userdata = 0;
 
     NRF_USBD->EPOUTEN |= 0x1 << ep;
-    NRF_USBD->SIZE.EPOUT[ep] = 0;
+
+    startRead();
 }
 
 int UsbEndpointOut::disableIRQ()
@@ -399,25 +399,23 @@ int UsbEndpointOut::enableIRQ()
 void UsbEndpointOut::startRead()
 {
     NRF_USBD->SIZE.EPOUT[ep] = 0;
-
     NRF_USBD->EPOUT[ep].PTR    = (uint32_t) buf;
     NRF_USBD->EPOUT[ep].MAXCNT = USB_MAX_PKT_SIZE;
-
-    NRF_USBD->EVENTS_ENDEPOUT[ep] = 0;
-    NRF_USBD->TASKS_STARTEPOUT[ep] = 1;
-
-    while(NRF_USBD->EVENTS_ENDEPOUT[ep] == 0);
 }
 
 int UsbEndpointOut::read(void *dst, int maxlen)
 {
     usb_assert(this != NULL);
 
+    NRF_USBD->EVENTS_ENDEPOUT[ep] = 0;
+    NRF_USBD->TASKS_STARTEPOUT[ep] = 1;
+    while(NRF_USBD->EVENTS_ENDEPOUT[ep] == 0);
+
     int packetSize = nrf_usbd_epout_size_get(NRF_USBD, ep);
 
     if (packetSize)
     {
-        // LOG("USBRead(%d) => %d bytes", ep, packetSize);
+        LOG("USBRead(%d) => %d bytes", ep, packetSize);
         userdata -= packetSize;
         // Note that we shall discard any excessive data
         if (packetSize > maxlen)
@@ -431,22 +429,22 @@ int UsbEndpointOut::read(void *dst, int maxlen)
     return packetSize;
 }
 
-static void writeEP(uint8_t *data, uint8_t ep, int len)
+static int writeEP(UsbEndpointIn* endpoint, uint8_t *data, int len)
 {
     usb_assert(len <= USB_MAX_PKT_SIZE);
-    NRF_USBD->EPIN[ep].PTR    = (uint32_t) data;
-    NRF_USBD->EPIN[ep].MAXCNT = len;
+    NRF_USBD->EPIN[endpoint->ep].PTR    = (uint32_t) data;
+    NRF_USBD->EPIN[endpoint->ep].MAXCNT = len;
 
 
     NRF_USBD->EVENTS_EP0DATADONE = 0;
     NRF_USBD->EVENTS_EPDATA = 0;
-    NRF_USBD->EVENTS_ENDEPIN[ep] = 0;
+    NRF_USBD->EVENTS_ENDEPIN[endpoint->ep] = 0;
 
-    NRF_USBD->TASKS_STARTEPIN[ep] = 1;
+    NRF_USBD->TASKS_STARTEPIN[endpoint->ep] = 1;
 
-    DBG("write: %p len=%d at IN %d", data, len, ep);
+    LOG("write: %p len=%d at IN %d", data, len, endpoint->ep);
 
-    if (ep == 0)
+    if (endpoint->ep == 0)
     {
         // no data stage (and therefore no EP0DATADONE event), initiate ep0status asap.
         if (len == 0)
@@ -455,13 +453,23 @@ static void writeEP(uint8_t *data, uint8_t ep, int len)
             while(NRF_USBD->EVENTS_EP0DATADONE == 0);
     }
     else {
-        while(NRF_USBD->EVENTS_EPDATA == 0);
+        while(NRF_USBD->EVENTS_EPDATA == 0 && !(endpoint->flags & USB_EP_FLAG_HOST_CLEAR_STALL));
+
+        if (endpoint->flags & USB_EP_FLAG_HOST_CLEAR_STALL)
+            return DEVICE_INVALID_STATE;
     }
+
+    return DEVICE_OK;
 }
 
 int UsbEndpointIn::write(const void *src, int len)
 {
-    DBG("outer write %p/%d", src, len);
+    LOG("outer write %p/%d %d", src, len, wLength);
+
+    if (flags & USB_EP_FLAG_HOST_CLEAR_STALL)
+        return 0;
+
+    int transLen = len;
 
     // this happens when someone tries to write before USB is initialized
     usb_assert(this != NULL);
@@ -491,7 +499,10 @@ int UsbEndpointIn::write(const void *src, int len)
             n = USB_MAX_PKT_SIZE;
         memcpy(buf, src, n);
 
-        writeEP(buf, ep, n);
+        int ret = writeEP(this, buf, n);
+
+        if (ret < 0)
+            return 0;
 
         len -= n;
         src = (const uint8_t *)src + n;
@@ -500,8 +511,10 @@ int UsbEndpointIn::write(const void *src, int len)
             break;
     }
 
-    if (zlp && len && (len & (USB_MAX_PKT_SIZE - 1)) == 0)
-        writeEP(buf, ep, 0);
+    LOG("zlp %d len %d cond %d", zlp, len, (len & (USB_MAX_PKT_SIZE - 1)));
+
+    if (zlp && transLen && (transLen & (USB_MAX_PKT_SIZE - 1)) == 0)
+        writeEP(this, buf, 0);
     else if (ep == 0 && tlen)
     {
         // unless it is a ZLP, we will need to initiate status stage ourselves here.
