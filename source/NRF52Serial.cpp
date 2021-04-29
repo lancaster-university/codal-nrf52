@@ -183,6 +183,7 @@ int NRF52Serial::disableInterrupt(SerialInterruptType t)
         // In addition, using a function that does not use the codal::Serial structure,
         // such as printf and putc, causes problems, 
         // so it is not right to turn on and off the driver interrupts in this function.
+        // NRF52Serial::configurePins assumes the interrupt is not disabled
     }
 
     return DEVICE_OK;
@@ -209,8 +210,12 @@ int NRF52Serial::setBaudrate(uint32_t baudrate)
 
 int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 {
-    this->tx = tx;
-    this->rx = rx;
+    //Serial::redirect surrounds its call to this function with
+    //disableInterrupt(TxInterrupt) and enableInterrupt(TxInterrupt)
+    //but NRF52Serial's implementation of those doesn't change the interrupt.
+    //When we get here tx is locked, but the tx interrupt is still working to empty the buffer
+    while (txBufferedSize() > 0 || is_tx_in_progress_) /*wait*/;
+
     nrf_uarte_txrx_pins_set(p_uarte_, tx.name, rx.name);
       
     return DEVICE_OK;
