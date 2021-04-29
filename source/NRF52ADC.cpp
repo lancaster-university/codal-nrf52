@@ -60,17 +60,18 @@ extern "C" void SAADC_IRQHandler()
 
 /**
  * Constructor
+ * @param adc reference to the ADC hardware used by this channel
  * @param channel The analog identifier of this channel
  */
-NRF52ADCChannel::NRF52ADCChannel(uint8_t channel) : output(*this)
+NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), output(*this)
 {
     this->channel = channel;
     this->size = buffer.length();
     this->bufferSize = NRF52_ADC_DMA_SIZE;
-    this->setGain();
+    this->gain = 2;
+    this->bias = 0;
     this->status = 0;
-
-    this->disable();
+    this->lastSample = 0;
 
     // Define our output stream as non-blocking.
     output.setBlocking(false);
@@ -124,54 +125,17 @@ int NRF52ADCChannel::setBufferSize(int bufferSize)
 /**
  * Enable this channel
  */
-int NRF52ADCChannel::servicePendingRequests()
-{
-    int result = 0;
-
-    if (status & NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE)
-    {
-        NRF_SAADC->CH[channel].PSELP = channel+1;
-        NRF_SAADC->CH[channel].PSELN = 0;
-        status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE;
-        status |= NRF52_ADC_CHANNEL_STATUS_ENABLED;
-        result=1;
-    }
-
-    if (status & NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE)
-    {
-        NRF_SAADC->CH[channel].PSELP = 0;
-        NRF_SAADC->CH[channel].PSELN = 0;
-        status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE;
-        status &= ~NRF52_ADC_CHANNEL_STATUS_ENABLED;
-        result=1;
-    }
-
-    if (status & NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED)
-    {
-        status &= ~NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED;
-        result = 1;
-    }
-
-    return result;
-}
-
-/**
- * Enable this channel
- */
 void NRF52ADCChannel::enable()
 {
-    if (!isEnabled())
-        status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE;
+    status |= NRF52_ADC_CHANNEL_STATUS_ENABLED;
 }
-
 
 /**
  * Disable this channel
  */
 void NRF52ADCChannel::disable()
 {
-    if (isEnabled())
-        status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE;
+    status &= ~NRF52_ADC_CHANNEL_STATUS_ENABLED;
 }
 
 /**
@@ -208,21 +172,41 @@ ManagedBuffer NRF52ADCChannel::pull()
  */
 uint16_t NRF52ADCChannel::getSample()
 {
-    // Flag that we need to take a sample
-    status |= NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
+    if (!isEnabled())
+        return 0;
 
-    // Cycle the ADC, so that it pushes a DMA buffer.
-    NRF_SAADC->INTENSET =  (SAADC_INTENSET_RESULTDONE_Enabled << SAADC_INTENSET_RESULTDONE_Pos);
-    //NRF_SAADC->TASKS_STOP = 1;
+    // Get the currently active DMA buffer
+    ManagedBuffer b = adc.getActiveDMABuffer();
 
-    // Spin until the sample arrives, then return the result.
-    while(status & NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE);
+    // Determine the offset of skip value of this channel within the buffer.
+    int skip = adc.getActiveChannelCount();
+    int offset = adc.getChannelOffset(channel);
 
-    // Clip off any samples below the negative rail...
-    if (lastSample < 0)
-        lastSample = 0;
+    // Generate pointers to the start and end of the DMA buffer
+    uint16_t *ptr = (uint16_t *) b.getBytes();
+    uint16_t *end = (uint16_t *) (b.getBytes() + b.length());
 
-    return (uint16_t) lastSample;
+    // Account for multiplexed offset
+    ptr += offset;
+
+    // Find the last entry in the buffer that's been written for this channel
+    if (*ptr != 0x8888)
+    {
+        while (*ptr != 0x8888 && ptr < end)
+            ptr += skip;
+
+        ptr -= skip;
+
+        lastSample = *((int16_t *) ptr);
+    }
+
+    // Clip off the negative rail
+    // Protect against IRQ changing lastSample after clip
+    int16_t sample = lastSample;
+    if (sample < 0)
+        sample = 0;
+
+    return (uint16_t) sample;
 }
 
 /**
@@ -252,20 +236,46 @@ int NRF52ADCChannel::setGain(int gain, int bias)
     if (gain < 0 || gain > 7 || bias < 0 || bias > 3)
         return DEVICE_INVALID_PARAMETER;
 
-    // Update settings in the SAADC.
-    
+    this->gain = gain;
+    this->bias = bias;
+
+    configureGain();
+
+    return DEVICE_OK;
+}
+
+/**
+ * Configure the gain level and the resistor bias.
+ *
+ */
+void NRF52ADCChannel::configureGain()
+{
     NRF_SAADC->CH[channel].CONFIG = (bias << SAADC_CH_CONFIG_RESP_Pos) |
         (SAADC_CH_CONFIG_RESN_Bypass << SAADC_CH_CONFIG_RESN_Pos) |
         (gain << SAADC_CH_CONFIG_GAIN_Pos) |
         (SAADC_CH_CONFIG_REFSEL_VDD1_4 << SAADC_CH_CONFIG_REFSEL_Pos) |
         (SAADC_CH_CONFIG_TACQ_3us << SAADC_CH_CONFIG_TACQ_Pos) |
         (SAADC_CH_CONFIG_BURST_Disabled << SAADC_CH_CONFIG_BURST_Pos );
+}
 
+/**
+  * Determine the gain level for the analog input.
+  *
+  * @return The gain.
+  */
+int NRF52ADCChannel::getGain()
+{
+    return gain;
+}
 
-    // inidcate that the ADC should be cycled at the next opportunity to start using the new settings
-    status |= NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED;
-
-    return DEVICE_OK;
+/**
+  * Determine the bias for the analog input.
+  *
+  * @return The bias.
+  */
+int NRF52ADCChannel::getBias()
+{
+    return bias;
 }
 
 /**
@@ -285,9 +295,6 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int o
 
     if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0)
         return;
-
-    // If we were waiting for a discrete sample to arrive, indicate that it's ready.
-    status &= ~NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE;
 
     // If this buffer is too shot to contain information for us, ignore it.
     // n.b. The above test is safe, as a short buffer implies that our lastSample is already up to date.
@@ -355,16 +362,19 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int o
  * @param samplePeriod the time between samples generated in the output buffer (in microseconds)
  * @param id The id to use for the message bus when transmitting events.
  */
-NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : timer(adcTimer), channels{0,1,2,3,4,5,6,7}
+NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : timer(adcTimer), channels{NRF52ADCChannel(*this, 0), NRF52ADCChannel(*this, 1), NRF52ADCChannel(*this, 2), NRF52ADCChannel(*this, 3), NRF52ADCChannel(*this, 4), NRF52ADCChannel(*this, 5), NRF52ADCChannel(*this, 6), NRF52ADCChannel(*this, 7)}
 {
     // Store our configuration data.
     this->id = id;
+    this->samplePeriod = samplePeriod;
     this->softwareOversample = 1;
     this->bufferSize = NRF52_ADC_DMA_SIZE;
+    this->enabledChannels = 0;
+    this->running = false;
 
     // Initialise receive buffers
-    dma[0] = ManagedBuffer(bufferSize);
-    dma[1] = ManagedBuffer(bufferSize);
+    dma[0] = allocateDMABuffer();
+    dma[1] = allocateDMABuffer();
     activeDMA = 0;
 
     // Record a handle to this driver object, for use by the IRQ handler.
@@ -372,7 +382,7 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
 
     // Ensure SAADC module is disabled (typically needed for determinstic configuration)
     NVIC_DisableIRQ(SAADC_IRQn);
-    this->disable();
+    NRF_SAADC->ENABLE = 0;
 
     // Enable 14 bit sampling (although it's rather nicely delivered as a 16 bit sample).
     NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_14bit << SAADC_RESOLUTION_VAL_Pos);
@@ -384,12 +394,12 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
 
     // Configure a PPI channel to automatically launch a START event when an END event occurs
     // (continuous sampling, with double buffered DMA)
+    NRF_PPI->CHENCLR = 1;
     NRF_PPI->CH[0].EEP = (uint32_t) &NRF_SAADC->EVENTS_END;
     NRF_PPI->CH[0].TEP = (uint32_t) &NRF_SAADC->TASKS_START;
-    NRF_PPI->CHENSET = 1;
 
-     // Set samplerate and calculate oversampling values
-    this->setSamplePeriod(samplePeriod);
+    // Set samplerate and calculate oversampling values
+    configureSampling();
 
     // Enable moderately high priority interrupt
     NVIC_SetPriority(SAADC_IRQn, 0);
@@ -400,6 +410,21 @@ NRF52ADC::NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id) : 
     timer.disableIRQ();
 }
 
+/**
+ * Allocate a new DMA buffer
+ * @return A newly allocated DMA buffer, initialized and ready for use.
+ */
+ManagedBuffer NRF52ADC::allocateDMABuffer()
+{
+    ManagedBuffer b(bufferSize, BufferInitialize::None);
+
+    // Fill the buffer with values unused by the ADC hardware. We can use this to perform demuxing 
+    // of a live DMA buffer as it is being filled. :)
+    // We choose 0x88 as a 16 bit signed 0x8888 is an invalid 14 bit sample (either +ve or -ve)
+    b.fill(0x88);
+
+    return b;
+}
 
 void NRF52ADC::irq()
 {
@@ -408,7 +433,6 @@ void NRF52ADC::irq()
         // Snapshot the buffer we just received into
         int completeBuffer = activeDMA;
         int offset = 0;
-        int channelsChanged = 0;
 
         // Flip to our other buffer.
         activeDMA = (activeDMA + 1) % 2;
@@ -423,55 +447,24 @@ void NRF52ADC::irq()
         {
             if (NRF_SAADC->CH[channel].PSELP)
                 channels[channel].demux(dma[completeBuffer], offset++, enabledChannels, softwareOversample);
-            
-            // Callback 
-            channelsChanged += channels[channel].servicePendingRequests();
         }
 
         // Indicate we've processed the interrupt
         if(NRF_SAADC->EVENTS_END)
             NRF_SAADC->EVENTS_END = 0;
 
-        // If we've been stopped, the number of active channels may have changed. 
-        // Recalculate DMA buffer size, ensure the our target DMA buffer sample count is a multiple of the channel count.
-        // Recalculate OVERSAMPLE and timer settings accordingly.
         if(NRF_SAADC->EVENTS_STOPPED){
             NRF_SAADC->EVENTS_STOPPED = 0;
-         
-            if ((status & NRF52ADC_STATUS_PERIOD_CHANGED) || (channelsChanged > 0 && enabledChannels > 0))
-            {
-                status &= ~NRF52ADC_STATUS_PERIOD_CHANGED;
-
-                NRF_SAADC->ENABLE = 0;
-                NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels);  
-                setSamplePeriod(samplePeriod);
-                NRF_SAADC->ENABLE = 1;
-                NRF_SAADC->TASKS_START = 1;
-            }
+            this->running = false;
         }
-
-        NRF_SAADC->EVENTS_RESULTDONE = 0;
-
-        // Stop sampling if no channels are active.
-        if (enabledChannels == 0)
-            NRF_SAADC->ENABLE = 0;
     }
- 
+
     if (NRF_SAADC->EVENTS_STARTED)
     {
         int nextDMA = (activeDMA + 1) % 2;
-        dma[nextDMA] = ManagedBuffer(bufferSize);
+        dma[nextDMA] = allocateDMABuffer();
         NRF_SAADC->RESULT.PTR = (uint32_t) &dma[nextDMA][0];
         NRF_SAADC->EVENTS_STARTED = 0;
-    }
-
-    if (NRF_SAADC->EVENTS_RESULTDONE && NRF_SAADC->INTENSET & (SAADC_INTENSET_RESULTDONE_Enabled << SAADC_INTENSET_RESULTDONE_Pos))
-    {
-        // A result has completed, and we've been flagged to interrupt on sample complete.
-        // Clear the request and issue a STOP event to flush our buffer.
-        NRF_SAADC->INTENCLR =  (SAADC_INTENSET_RESULTDONE_Enabled << SAADC_INTENSET_RESULTDONE_Pos);
-        NRF_SAADC->EVENTS_RESULTDONE = 0;
-        NRF_SAADC->TASKS_STOP = 1;
     }
 }
 
@@ -480,16 +473,7 @@ void NRF52ADC::irq()
  */
 void NRF52ADC::enable()
 {
-
-    if (NRF_SAADC->ENABLE == 0 && enabledChannels > 0)
-    {
-        // TODO: define MAXCNT to be a multiple of the number of active channels, to keep DMA transfers easy to manage.
-        dma[activeDMA] = ManagedBuffer(bufferSize);
-        NRF_SAADC->RESULT.PTR = (uint32_t) &dma[activeDMA][0];
-        NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels); 
-        NRF_SAADC->ENABLE = 1;
-        NRF_SAADC->TASKS_START = 1;
-    }
+    startRunning();
 }
 
 /**
@@ -497,7 +481,10 @@ void NRF52ADC::enable()
  */
 void NRF52ADC::disable()
 {
-    // Schedule all DMA transfers to stop after the next DMA transaction completes.
+    stopRunning();
+    NRF_SAADC->ENABLE = 0;
+
+    // Disable all channels.
     for (int i = 0; i < NRF52_ADC_CHANNELS; i++)
         channels[i].disable();
     
@@ -521,17 +508,20 @@ int NRF52ADC::getSamplePeriod()
  */
 int NRF52ADC::setSamplePeriod(int samplePeriod)
 {
+    bool wasRunning = stopRunning();
     // Store the sample rate for later.
     this->samplePeriod = samplePeriod;
+    if (wasRunning)
+        startRunning();
+    return DEVICE_OK;
+}
 
-    // If ADC is running, simply cycle it, and we'll get called back in IRQ context. 
-    if (NRF_SAADC->ENABLE)
-    {
-        status |= NRF52ADC_STATUS_PERIOD_CHANGED;
-        NRF_SAADC->TASKS_STOP = 1;
-        return DEVICE_OK;
-    }
-
+/**
+ * Set samplerate and calculate oversampling values.
+ *
+ */
+void NRF52ADC::configureSampling()
+{
     // We use a generic timer to drive the ADC.
     // The ADC does have an internal clock, but only supports a single ADC channel, which is too limiting for us.
     // Why does it only support one channel? Who knows!  ¯\_(ツ)_/¯
@@ -586,14 +576,12 @@ int NRF52ADC::setSamplePeriod(int samplePeriod)
 
     // use a PPI channel to link the timer overflow event with the ADC START task.
     // TODO: Add PPI channel to the resource registry...
+    NRF_PPI->CHENCLR = 2;
     NRF_PPI->CH[1].EEP = (uint32_t) &timer.timer->EVENTS_COMPARE[0];
     NRF_PPI->CH[1].TEP = (uint32_t) &NRF_SAADC->TASKS_SAMPLE;
-    NRF_PPI->CHENSET = 2;
 
     // Reset the timer.
     timer.timer->TASKS_CLEAR = 1;
-
-    return DEVICE_OK;
 }
 
 /**
@@ -612,8 +600,55 @@ int NRF52ADC::getDmaBufferSize()
  */
 int NRF52ADC::setDmaBufferSize(int bufferSize)
 {
+    bool wasRunning = stopRunning();
     this->bufferSize = bufferSize;
+    if (wasRunning)
+        startRunning();
     return DEVICE_OK;
+}
+
+/**
+ * Gets the currently active DMA buffer (the one currently being filled)
+ * @return the currently active DMA buffer
+ */
+ManagedBuffer NRF52ADC::getActiveDMABuffer()
+{
+    ManagedBuffer b;
+
+    target_disable_irq();
+    b = dma[activeDMA];
+    target_enable_irq();
+
+    return b;
+}
+
+/**
+ * Determine the number of active DMA channels currently being multiplexed
+ * @return the number of active channels
+ */
+int NRF52ADC::getActiveChannelCount()
+{
+    return enabledChannels;
+}
+
+/**
+ * Determine the offset of the given DMA channels in the raw multiplexed data stream.
+ * @return the offset of the channel in the stream
+ */
+int NRF52ADC::getChannelOffset(int channel)
+{
+    int offset = 0;
+
+    for (int c = 0; c < NRF52_ADC_CHANNELS; c++)
+    {
+        if (NRF_SAADC->CH[c].PSELP)
+            offset++;
+
+        if (c == channel)
+            return offset-1;
+    }
+
+    return DEVICE_INVALID_PARAMETER;
 }
 
 /**
@@ -632,26 +667,14 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
 
     if (!channels[c].isEnabled())
     {
+        stopRunning();
         channels[c].enable();
-        enabledChannels++;
-
-        // If this is the first channel enabled, enable the ADC.
-        // Otherwise, signal a STOP event to restart the ADC
-        // with this new channel included.
-
-        if (enabledChannels == 1)
-        {
-            channels[c].servicePendingRequests();
-            this->enable();
-        }
-        else
-        {
-            NRF_SAADC->TASKS_STOP = 1;
-        }
+        startRunning();
     }
 
     return &channels[c];
 }
+
 /**
  * Release a previously a new ADC channel, if available, for the given pin.
  * @param pin The pin to detach.
@@ -668,10 +691,110 @@ int NRF52ADC::releaseChannel(Pin& pin)
 
     if (channels[c].isEnabled())
     {
+        bool wasRunning = stopRunning();
         channels[c].disable();
-        this->enabledChannels--;
+        if (wasRunning)
+            startRunning();
     }
-    
     return DEVICE_OK;
 }
 
+bool NRF52ADC::stopRunning()
+{
+    if ( !running)
+      return false;
+
+    //Disable PPI links
+    NRF_PPI->CHENCLR = 3;
+
+    while ( NRF_SAADC->STATUS & 1) /*wait for not busy*/;
+
+    NRF_SAADC->TASKS_STOP = 1;
+    while ( running) /*wait for stop*/;
+
+    return true;
+}
+
+
+bool NRF52ADC::startRunning()
+{
+    if ( running)
+        return true;
+
+    // https://infocenter.nordicsemi.com/topic/errata_nRF52833_Rev1/ERR/nRF52833/Rev1/latest/anomaly_833_212.html
+    volatile uint32_t temp1;
+    volatile uint32_t temp2;
+    volatile uint32_t temp3;
+
+    temp1 = *(volatile uint32_t *)0x40007640ul;
+    temp2 = *(volatile uint32_t *)0x40007644ul;
+    temp3 = *(volatile uint32_t *)0x40007648ul;
+
+    *(volatile uint32_t *)0x40007FFCul = 0ul; 
+    *(volatile uint32_t *)0x40007FFCul; 
+    *(volatile uint32_t *)0x40007FFCul = 1ul;
+
+    *(volatile uint32_t *)0x40007640ul = temp1;
+    *(volatile uint32_t *)0x40007644ul = temp2;
+    *(volatile uint32_t *)0x40007648ul = temp3;
+
+    NRF_SAADC->ENABLE = 0;
+
+    // Enable 14 bit sampling (although it's rather nicely delivered as a 16 bit sample).
+    NRF_SAADC->RESOLUTION = (SAADC_RESOLUTION_VAL_14bit << SAADC_RESOLUTION_VAL_Pos);
+
+    // Configure for an interrupt on STARTED, END and STOP events.
+    NRF_SAADC->INTENSET = (SAADC_INTENSET_STARTED_Enabled << SAADC_INTENSET_STARTED_Pos) |
+        (SAADC_INTENSET_END_Enabled << SAADC_INTENSET_END_Pos) |
+        (SAADC_INTENSET_STOPPED_Enabled << SAADC_INTENSET_STOPPED_Pos );
+
+    // Configure channels
+    enabledChannels = 0;
+            
+    for (int channel = 0; channel < NRF52_ADC_CHANNELS; channel++)
+    {
+        if ( channels[channel].isEnabled())
+        {
+            enabledChannels++;
+
+            channels[channel].configureGain();
+
+            NRF_SAADC->CH[channel].PSELP = channel+1;
+            NRF_SAADC->CH[channel].PSELN = 0;
+        }
+        else
+        {
+            NRF_SAADC->CH[channel].PSELP = 0;
+            NRF_SAADC->CH[channel].PSELN = 0;
+        }
+    }
+
+    // Stop sampling if no channels are active.
+    if (enabledChannels == 0)
+    {
+        return false;
+    }
+
+    NRF_SAADC->ENABLE = 1;
+
+    // Recalculate DMA buffer size, ensure the our target DMA buffer sample count is a multiple of the channel count.
+    // Recalculate OVERSAMPLE and timer settings accordingly.
+    configureSampling();
+
+    // TODO: define MAXCNT to be a multiple of the number of active channels, to keep DMA transfers easy to manage.
+    dma[activeDMA] = allocateDMABuffer();
+    volatile uint16_t *dmaLast = ((uint16_t *) &dma[activeDMA][0]) + (enabledChannels - 1);
+
+    NRF_SAADC->RESULT.PTR = (uint32_t) &dma[activeDMA][0];
+    NRF_SAADC->RESULT.MAXCNT = NRF52ADC_DMA_ALIGNED_SIZED(enabledChannels); 
+    NRF_SAADC->TASKS_START = 1;
+
+    //Enable PPI links
+    NRF_PPI->CHENSET = 3;
+
+    running = true;
+
+    while ( *dmaLast == 0x8888) /*wait for first sample*/;
+
+    return true;
+}

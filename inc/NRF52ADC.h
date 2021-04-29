@@ -48,32 +48,34 @@ using namespace codal;
 //
 // NRF52ADCChannel status codes
 //
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_ENABLE           0x01
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_DISABLE          0x02
-#define NRF52_ADC_CHANNEL_STATUS_AWAIT_SAMPLE           0x04
-#define NRF52_ADC_CHANNEL_STATUS_CONFIG_CHANGED         0x08
 #define NRF52_ADC_CHANNEL_STATUS_ENABLED                0x10
 #define NRF52_ADC_CHANNEL_STATUS_CONNECTED              0x20
+
+class NRF52ADC;
 
 class NRF52ADCChannel : public DataSource
 {
 private:
 
+    NRF52ADC            &adc;
     ManagedBuffer       buffer;
     volatile int16_t    lastSample;
     int16_t             size;
     int16_t             bufferSize;
     volatile uint8_t    status;
     uint8_t             channel;
+    uint8_t             gain;
+    uint8_t             bias;
  
 public:
     DataStream      output;
 
     /**
      * Constructor
+     * @param adc reference to the ADC hardware used by this channel
      * @param channel The analog identifier of this channel
      */
-    NRF52ADCChannel(uint8_t channel);
+    NRF52ADCChannel(NRF52ADC &adc, uint8_t channel);
 
     /**
      * Enable this component
@@ -155,6 +157,26 @@ public:
      * 3: Activate pull to VDD/2
      */
     int setGain(int gain = 2, int bias = 0);
+
+    /**
+     * Determine the gain level for the analog input.
+     *
+     * @return The gain.
+     */
+    int getGain();
+
+    /**
+     * Determine the bias for the analog input.
+     *
+     * @return The bias.
+     */
+    int getBias();
+
+    /**
+     * Configure the gain level and the resistor bias.
+     *
+     */
+    void configureGain();
     
     /**
     * Demultiplexes the current DMA output buffer into the buffer of this channel.
@@ -165,12 +187,6 @@ public:
     * @param oversample the number of samples to aggregate in sofware into a final result.
     */
     void demux(ManagedBuffer dmaBuffer, int offset, int skip, int oversample);
-
-    /**
-     * IRQ callback to activate/deactivate a pending channel
-     * @return 1 if this channel changes status, ero otherwise.
-     */
-    int servicePendingRequests();
 };
 
 #define NRF52ADC_STATUS_PERIOD_CHANGED              0x01        // Indicates that the period of the ADC may have changed.
@@ -179,7 +195,7 @@ public:
 class NRF52ADC : public CodalComponent
 {
 
-private:
+public:
 	uint32_t            samplePeriod;                           // The ADC sample period, in microseconds.
     uint16_t            bufferSize;                             // The size of our buffer.
     uint8_t             enabledChannels;                        // Determines the number of currently active channels.
@@ -188,7 +204,7 @@ private:
     NRF52ADCChannel     channels[NRF52_ADC_CHANNELS];           // ADC channel objects
     ManagedBuffer       dma[2];                                 // Double buffered DMA receive buffers.
     int                 softwareOversample;                     // The level of software oversampling level in use.
-
+    volatile bool       running;
    
 public:
     /**
@@ -199,6 +215,12 @@ public:
       * @param id The id to use for the message bus when transmitting events.
       */
     NRF52ADC(NRFLowLevelTimer &adcTimer, int samplePeriod, uint16_t id = DEVICE_ID_SYSTEM_ADC);
+
+    /**
+     * Allocate a new DMA buffer
+     * @return A newly allocated DMA buffer, initialized and ready for use.
+     */
+    ManagedBuffer allocateDMABuffer();
 
     /**
      * Interrupt callback when playback of DMA buffer has completed
@@ -242,6 +264,24 @@ public:
     int setDmaBufferSize(int bufferSize);
 
     /**
+     * Gets the currently active DMA buffer (the one currently being filled)
+     * @return the currently active DMA buffer
+     */
+    ManagedBuffer getActiveDMABuffer();
+
+    /**
+     * Determine the number of active DMA channels currently being multiplexed
+     * @return the number of active channels
+     */
+    int getActiveChannelCount();
+
+    /**
+     * Determine the offset of the given DMA channels in the raw multiplexed data stream.
+     * @return the offset of the channel in the stream
+     */
+    int getChannelOffset(int channel);
+
+    /**
      * Acquire a new ADC channel, if available, for the given pin.
      * @param pin The pin to attach.
      * @return a pointer to an NRF52ADCChannel on success, NULL if the given pin does not support analogue input, or if all channels are in use.
@@ -255,6 +295,26 @@ public:
      */
     int releaseChannel(Pin& pin);
 
+private:
+    /**
+     * Stop the ADC running, if it is running.
+     * 
+     * @return true if it was running.
+     */
+    bool stopRunning();
+
+    /**
+     * Start the ADC running, if stopped and at least one channel is enabled.
+     *
+     * @return true if it is running.
+     */
+    bool startRunning();
+
+    /**
+     * Set samplerate and calculate oversampling values.
+     *
+     */
+    void configureSampling();
 };
 
 #endif
