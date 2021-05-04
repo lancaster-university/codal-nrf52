@@ -457,9 +457,7 @@ static int writeEP(UsbEndpointIn* endpoint, uint8_t *data, int len)
             while(NRF_USBD->EVENTS_EP0DATADONE == 0);
     }
     else {
-        // at 68 MHz, instructions take 14.7 nanoseconds
-        // set to roughly half a second
-        uint32_t timeout = 0xFFFFFFFF;
+        uint32_t timeout = 50000;
         while(NRF_USBD->EVENTS_EPDATA == 0 && timeout > 0)
             timeout--;
 
