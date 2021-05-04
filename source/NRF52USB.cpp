@@ -410,6 +410,9 @@ int UsbEndpointOut::read(void *dst, int maxlen)
 {
     usb_assert(this != NULL);
 
+    // we unset EP_TIMEOUT if there's a packet from the host.
+    endpoint->flags &= ~USB_EP_TIMEOUT;
+
     if (ep != 0 && !(ep_status & (USBD_EPDATASTATUS_EPOUT1_Msk << (ep - 1))))
         return 0;
 
@@ -458,10 +461,17 @@ static int writeEP(UsbEndpointIn* endpoint, uint8_t *data, int len)
             while(NRF_USBD->EVENTS_EP0DATADONE == 0);
     }
     else {
-        while(NRF_USBD->EVENTS_EPDATA == 0 && !(endpoint->flags & USB_EP_FLAG_HOST_CLEAR_STALL));
+        // at 68 MHz, instructions take 14.7 nanoseconds
+        // set to roughly half a second
+        uint32_t timeout = 0xFFFFFFFFFF;
+        while(NRF_USBD->EVENTS_EPDATA == 0 && timeout > 0)
+            timeout--;
 
-        if (endpoint->flags & USB_EP_FLAG_HOST_CLEAR_STALL)
+        if (timeout == 0)
+        {
+            endpoint->flags |= USB_EP_TIMEOUT;
             return DEVICE_INVALID_STATE;
+        }
     }
 
     return DEVICE_OK;
@@ -471,7 +481,7 @@ int UsbEndpointIn::write(const void *src, int len)
 {
     LOG("outer write %p/%d %d", src, len, wLength);
 
-    if (flags & USB_EP_FLAG_HOST_CLEAR_STALL)
+    if (flags & USB_EP_TIMEOUT)
         return 0;
 
     int transLen = len;
