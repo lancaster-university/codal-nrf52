@@ -63,7 +63,6 @@ static UsbEndpointIn *findInEp(int ep)
     }
     return NULL;
 }
-#endif
 
 static UsbEndpointOut *findOutEp(int ep)
 {
@@ -77,6 +76,7 @@ static UsbEndpointOut *findOutEp(int ep)
     }
     return NULL;
 }
+#endif
 
 inline void usb_pwr_detected()
 {
@@ -289,8 +289,7 @@ void usb_configure(uint8_t numEndpoints)
     NVIC_SetPriority(POWER_CLOCK_IRQn, NRFX_POWER_DEFAULT_CONFIG_IRQ_PRIORITY);
     NVIC_EnableIRQ(POWER_CLOCK_IRQn);
 
-    uint32_t status = NRF_POWER->USBREGSTATUS;
-
+    // already connected... immediately configure usb...
     if (nrf_power_usbregstatus_vbusdet_get(NRF_POWER))
         usb_pwr_detected();
     if (nrf_power_usbregstatus_outrdy_get(NRF_POWER))
@@ -410,9 +409,6 @@ int UsbEndpointOut::read(void *dst, int maxlen)
 {
     usb_assert(this != NULL);
 
-    // we unset EP_TIMEOUT if there's a packet from the host.
-    endpoint->flags &= ~USB_EP_TIMEOUT;
-
     if (ep != 0 && !(ep_status & (USBD_EPDATASTATUS_EPOUT1_Msk << (ep - 1))))
         return 0;
 
@@ -463,7 +459,7 @@ static int writeEP(UsbEndpointIn* endpoint, uint8_t *data, int len)
     else {
         // at 68 MHz, instructions take 14.7 nanoseconds
         // set to roughly half a second
-        uint32_t timeout = 0xFFFFFFFFFF;
+        uint32_t timeout = 0xFFFFFFFF;
         while(NRF_USBD->EVENTS_EPDATA == 0 && timeout > 0)
             timeout--;
 
