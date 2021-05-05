@@ -72,6 +72,11 @@ namespace codal
         virtual int getc() override;
         virtual int setBaudrate(uint32_t baudrate) override;
 
+        /**
+          * Puts the component in (or out of) sleep (low power) mode.
+          */
+        virtual int setSleep(bool doSleep) override;
+
         ~NRF52Serial();
     };
 }
