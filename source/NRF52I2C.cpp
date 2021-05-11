@@ -143,11 +143,16 @@ int NRF52I2C::waitForStop(int evt)
         // Could be an undocumented silicon errata.
         // Appears to only occur under higher levels of background interrupt load.
         if (locked >= 100 && p_twim->EVENTS_LASTTX && (p_twim->SHORTS & NRF_TWIM_SHORT_LASTTX_SUSPEND_MASK) && !p_twim->EVENTS_SUSPENDED)
+        {
             p_twim->TASKS_SUSPEND = 1;
+            locked = 0;
+        }
 
         if (locked >= 100 && p_twim->EVENTS_LASTTX && (p_twim->SHORTS & NRF_TWIM_SHORT_LASTTX_STOP_MASK) && !p_twim->EVENTS_STOPPED)
+        {
             p_twim->TASKS_STOP = 1;
-
+            locked = 0;
+        }
         target_wait_us(10);
     }
 
