@@ -132,11 +132,21 @@ int NRF52I2C::waitForStop(int evt)
         // If we started a zero length transmission task (typically a bus probe), then timeout
         // after 1ms. The hardware has no way to relay succesful completion, but may return
         // an error condition.
-        if (p_twim->EVENTS_TXSTARTED && p_twim->TXD.MAXCNT == 0 && locked++ == 100)
+        locked++;
+        if (p_twim->EVENTS_TXSTARTED && p_twim->TXD.MAXCNT == 0 && locked >= 100)
         {
             res = DEVICE_OK;
             break;
         }
+
+        // Test for condition where the SHORTS configuration appears to not trigger TASKS as expected.
+        // Could be an undocumented silicon errata.
+        // Appears to only occur under higher levels of background interrupt load.
+        if (locked >= 100 && p_twim->EVENTS_LASTTX && (p_twim->SHORTS & NRF_TWIM_SHORT_LASTTX_SUSPEND_MASK) && !p_twim->EVENTS_SUSPENDED)
+            p_twim->TASKS_SUSPEND = 1;
+
+        if (locked >= 100 && p_twim->EVENTS_LASTTX && (p_twim->SHORTS & NRF_TWIM_SHORT_LASTTX_STOP_MASK) && !p_twim->EVENTS_STOPPED)
+            p_twim->TASKS_STOP = 1;
 
         target_wait_us(10);
     }
