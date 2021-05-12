@@ -208,9 +208,9 @@ void NRF52Pin::disconnect()
         PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
     }
 
-    // Reset status flags to zero, but retain preferred TouchSense and Polarity mode.
+    // Reset status flags to zero, but retain preferred TouchSense, Polarity and wake modes.
     obj = NULL;
-    status &= (IO_STATUS_CAPACITATIVE_TOUCH | IO_STATUS_ACTIVE_HI);
+    status &= IO_STATUS_MODES;
 }
 
 /**
