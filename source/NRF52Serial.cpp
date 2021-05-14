@@ -314,9 +314,6 @@ int NRF52Serial::setSleep(bool doSleep)
             lockTx();
             lockRx();
 
-            if(txBufferedSize() > 0)
-                disableInterrupt(TxInterrupt);
-
             disableInterrupt(RxInterrupt);
 
             while (txBufferedSize() > 0 || is_tx_in_progress_) /*wait*/;
