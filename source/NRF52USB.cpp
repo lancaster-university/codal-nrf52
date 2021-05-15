@@ -457,15 +457,12 @@ static int writeEP(UsbEndpointIn* endpoint, uint8_t *data, int len)
             while(NRF_USBD->EVENTS_EP0DATADONE == 0);
     }
     else {
-        uint32_t timeout = 50000;
+        uint32_t timeout = 500000;
         while(NRF_USBD->EVENTS_EPDATA == 0 && timeout > 0)
             timeout--;
 
         if (timeout == 0)
-        {
-            endpoint->flags |= USB_EP_TIMEOUT;
             return DEVICE_INVALID_STATE;
-        }
     }
 
     return DEVICE_OK;
@@ -474,9 +471,6 @@ static int writeEP(UsbEndpointIn* endpoint, uint8_t *data, int len)
 int UsbEndpointIn::write(const void *src, int len)
 {
     LOG("outer write %p/%d %d", src, len, wLength);
-
-    if (flags & USB_EP_TIMEOUT)
-        return 0;
 
     int transLen = len;
 
