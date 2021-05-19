@@ -36,6 +36,7 @@ DEALINGS IN THE SOFTWARE.
 #include "EventModel.h"
 #include "CodalDmesg.h"
 #include "codal_target_hal.h"
+#include "NotifyEvents.h"
 
 
 using namespace codal;
@@ -94,16 +95,28 @@ static void process_gpio_irq(NRF_GPIO_Type* GPIO_PORT, int pinNumberOffset)
         pin = irq_pins[pinNumber + pinNumberOffset];
 
         // If that pin is registered for edge events
-        if (pin && (pin->status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE)))
+        if (pin)
         {
-            // Flip the sense bit of this pin to the opposite polarity (to sense the next edge)
-            GPIO_PORT->PIN_CNF[pinNumber] ^= 0x00010000;
+            if ( pin->status & (IO_STATUS_EVENT_ON_EDGE | IO_STATUS_EVENT_PULSE_ON_EDGE | IO_STATUS_INTERRUPT_ON_EDGE))
+            {
+                // Flip the sense bit of this pin to the opposite polarity (to sense the next edge)
+                GPIO_PORT->PIN_CNF[pinNumber] ^= 0x00010000;
 
-            // Invoke rise/fall handler in the pin according to the sensed polarity of this event
-            if (GPIO_PORT->PIN_CNF[pinNumber] & 0x00010000)
-                pin->rise();
-            else
-                pin->fall();
+                // Invoke rise/fall handler in the pin according to the sensed polarity of this event
+                if (GPIO_PORT->PIN_CNF[pinNumber] & 0x00010000)
+                    pin->rise();
+                else
+                    pin->fall();
+            }
+
+            if ( pin->getWakeOnActive() && fiber_scheduler_deepsleep())
+            {
+#if CONFIG_ENABLED(LIGHTWEIGHT_EVENTS)
+                Event(DEVICE_ID_NOTIFY, POWER_EVT_CANCEL_DEEPSLEEP);
+#else
+                Event(DEVICE_ID_NOTIFY, POWER_EVT_CANCEL_DEEPSLEEP);
+#endif
+            }
         }
     }
 
