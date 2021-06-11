@@ -109,13 +109,10 @@ static void process_gpio_irq(NRF_GPIO_Type* GPIO_PORT, int pinNumberOffset)
                     pin->fall();
             }
 
-            if ( pin->getWakeOnActive() && fiber_scheduler_get_deepsleep_pending())
+            if ( pin->getWakeOnActive())
             {
-#if CONFIG_ENABLED(LIGHTWEIGHT_EVENTS)
-                Event(DEVICE_ID_NOTIFY, POWER_EVT_CANCEL_DEEPSLEEP);
-#else
-                Event(DEVICE_ID_NOTIFY, POWER_EVT_CANCEL_DEEPSLEEP);
-#endif
+                if ( fiber_scheduler_get_deepsleep_pending())
+                    Event(DEVICE_ID_NOTIFY, POWER_EVT_CANCEL_DEEPSLEEP);
             }
         }
     }
