@@ -126,15 +126,6 @@ int NRFLowLevelTimer::disableIRQ()
 
 int NRFLowLevelTimer::reset()
 {
-    disableIRQ();
-    timer->TASKS_CLEAR = 1;
-    while (timer->TASKS_CLEAR);
-    enableIRQ();
-    return DEVICE_OK;
-}
-
-int NRFLowLevelTimer::resetPreservingIRQ()
-{
     int wasEnabled = NVIC_GetEnableIRQ(irqn);
     disableIRQ();
     timer->TASKS_CLEAR = 1;
@@ -194,15 +185,6 @@ int NRFLowLevelTimer::clearCompare(uint8_t channel)
 }
 
 uint32_t NRFLowLevelTimer::captureCounter()
-{
-    // 1 channel is used to capture the timer value (channel 3 indexed from zero)
-    disableIRQ();
-    uint32_t elapsed = counter_value(timer, 3);
-    enableIRQ();
-    return elapsed;
-}
-
-uint32_t NRFLowLevelTimer::captureCounterPreservingIRQ()
 {
     // 1 channel is used to capture the timer value (channel 3 indexed from zero)
     int wasEnabled = NVIC_GetEnableIRQ(irqn);
