@@ -270,13 +270,10 @@ int NRFLowLevelTimer::setSleep(bool doSleep)
             status |= CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE;
             disableIRQ();
         }
-        DMESG( "sleep %d enabled %d", (int) irqn, (int) (status & CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE));
     }
 
     if (!doSleep)
     {
-        DMESG( "wake %d enabled %d", (int) irqn, (int) (status & CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE));
-
         if ( status & CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE)
         {
             status &= ~CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE;
