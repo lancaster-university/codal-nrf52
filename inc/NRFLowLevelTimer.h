@@ -28,6 +28,8 @@ namespace codal
 
         virtual int reset();
 
+        virtual int resetPreservingIRQ();
+
         virtual int setMode(TimerMode t);
 
         virtual int setCompare(uint8_t channel, uint32_t value);
@@ -37,6 +39,8 @@ namespace codal
         virtual int clearCompare(uint8_t channel);
 
         virtual uint32_t captureCounter();
+
+        virtual uint32_t captureCounterPreservingIRQ();
 
         virtual int setClockSpeed(uint32_t speedKHz);
 

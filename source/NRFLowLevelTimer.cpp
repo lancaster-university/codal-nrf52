@@ -1,4 +1,5 @@
 #include "NRFLowLevelTimer.h"
+#include "CodalDmesg.h"
 
 #define PRESCALE_VALUE_MAX  9
 
@@ -132,6 +133,17 @@ int NRFLowLevelTimer::reset()
     return DEVICE_OK;
 }
 
+int NRFLowLevelTimer::resetPreservingIRQ()
+{
+    int wasEnabled = NVIC_GetEnableIRQ(irqn);
+    disableIRQ();
+    timer->TASKS_CLEAR = 1;
+    while (timer->TASKS_CLEAR);
+    if ( wasEnabled)
+        enableIRQ();
+    return DEVICE_OK;
+}
+
 int NRFLowLevelTimer::setMode(TimerMode t)
 {
     switch (t)
@@ -190,6 +202,17 @@ uint32_t NRFLowLevelTimer::captureCounter()
     return elapsed;
 }
 
+uint32_t NRFLowLevelTimer::captureCounterPreservingIRQ()
+{
+    // 1 channel is used to capture the timer value (channel 3 indexed from zero)
+    int wasEnabled = NVIC_GetEnableIRQ(irqn);
+    disableIRQ();
+    uint32_t elapsed = counter_value(timer, 3);
+    if ( wasEnabled)
+        enableIRQ();
+    return elapsed;
+}
+
 int NRFLowLevelTimer::setClockSpeed(uint32_t speedKHz)
 {
     // max speed is 16000Khz
@@ -240,19 +263,25 @@ int NRFLowLevelTimer::setBitMode(TimerBitMode t)
 
 int NRFLowLevelTimer::setSleep(bool doSleep)
 {
-    static bool irqWasEnabled = false;
-
     if (doSleep)
     {
-        irqWasEnabled = NVIC_GetEnableIRQ(irqn);
-        if (irqWasEnabled)
+        if ( NVIC_GetEnableIRQ(irqn))
+        {
+            status |= CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE;
             disableIRQ();
+        }
+        DMESG( "sleep %d enabled %d", (int) irqn, (int) (status & CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE));
     }
 
     if (!doSleep)
     {
-        if (irqWasEnabled)
+        DMESG( "wake %d enabled %d", (int) irqn, (int) (status & CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE));
+
+        if ( status & CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE)
+        {
+            status &= ~CODAL_LOWLEVELTIMER_STATUS_SLEEP_IRQENABLE;
             enableIRQ();
+        }
     }
 
     return DEVICE_OK;
