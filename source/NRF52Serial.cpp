@@ -308,12 +308,6 @@ int NRF52Serial::setSleep(bool doSleep)
     {
         if ( !(status & CODAL_SERIAL_STATUS_DEEPSLEEP))
         {
-            if(txInUse() || rxInUse())
-                return DEVICE_SERIAL_IN_USE;
-
-            lockTx();
-            lockRx();
-
             disableInterrupt(RxInterrupt);
 
             while (txBufferedSize() > 0 || is_tx_in_progress_) /*wait*/;
@@ -337,8 +331,6 @@ int NRF52Serial::setSleep(bool doSleep)
 
             this->setBaud(this->baudrate);
 
-            unlockRx();
-            unlockTx();
             status &= ~CODAL_SERIAL_STATUS_DEEPSLEEP;
         }
     }
