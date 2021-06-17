@@ -814,3 +814,30 @@ bool NRF52ADC::startRunning()
 
     return true;
 }
+
+/**
+ * Puts the component in (or out of) sleep (low power) mode.
+ */
+int NRF52ADC::setSleep(bool doSleep)
+{
+    static bool wasRunning;
+    static bool wasEnabled;
+
+    if (doSleep)
+    {
+        wasRunning = stopRunning();
+        wasEnabled = NVIC_GetEnableIRQ(SAADC_IRQn);
+        if (wasEnabled)
+            NVIC_DisableIRQ(SAADC_IRQn);
+    }
+    else
+    {
+        if (wasEnabled)
+            NVIC_EnableIRQ(SAADC_IRQn);
+        if (wasRunning)
+            startRunning();
+
+    }
+   
+    return DEVICE_OK;
+}

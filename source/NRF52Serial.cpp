@@ -183,6 +183,7 @@ int NRF52Serial::disableInterrupt(SerialInterruptType t)
         // In addition, using a function that does not use the codal::Serial structure,
         // such as printf and putc, causes problems, 
         // so it is not right to turn on and off the driver interrupts in this function.
+        // NRF52Serial::configurePins assumes the interrupt is not disabled
     }
 
     return DEVICE_OK;
@@ -209,8 +210,12 @@ int NRF52Serial::setBaudrate(uint32_t baudrate)
 
 int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 {
-    this->tx = tx;
-    this->rx = rx;
+    //Serial::redirect surrounds its call to this function with
+    //disableInterrupt(TxInterrupt) and enableInterrupt(TxInterrupt)
+    //but NRF52Serial's implementation of those doesn't change the interrupt.
+    //When we get here tx is locked, but the tx interrupt is still working to empty the buffer
+    while (txBufferedSize() > 0 || is_tx_in_progress_) /*wait*/;
+
     nrf_uarte_txrx_pins_set(p_uarte_, tx.name, rx.name);
       
     return DEVICE_OK;
@@ -290,4 +295,45 @@ void NRF52Serial::updateRxBufferAfterENDRX()
 void NRF52Serial::updateRxBufferAfterRXSTARTED()
 {
     nrf_uarte_rx_buffer_set(p_uarte_, dmaBuffer, CONFIG_SERIAL_DMA_BUFFER_SIZE);
+}
+
+/**
+ * Puts the component in (or out of) sleep (low power) mode.
+ */
+int NRF52Serial::setSleep(bool doSleep)
+{
+    IRQn_Type IRQn = get_alloc_peri_irqn(p_uarte_);
+
+    if (doSleep)
+    {
+        if ( !(status & CODAL_SERIAL_STATUS_DEEPSLEEP))
+        {
+            disableInterrupt(RxInterrupt);
+
+            while (txBufferedSize() > 0 || is_tx_in_progress_) /*wait*/;
+
+            NVIC_DisableIRQ(IRQn);
+
+            status |= CODAL_SERIAL_STATUS_DEEPSLEEP;
+        }
+    }
+    else
+    {
+        if ( status & CODAL_SERIAL_STATUS_DEEPSLEEP)
+        {
+            NVIC_ClearPendingIRQ(IRQn);
+            NVIC_EnableIRQ(IRQn);            
+
+            enableInterrupt(RxInterrupt);
+
+            if(txBufferedSize() > 0)
+                enableInterrupt(TxInterrupt);
+
+            this->setBaud(this->baudrate);
+
+            status &= ~CODAL_SERIAL_STATUS_DEEPSLEEP;
+        }
+    }
+   
+    return DEVICE_OK;
 }

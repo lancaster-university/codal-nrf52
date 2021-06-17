@@ -303,6 +303,11 @@ public:
      */
     int releaseChannel(Pin& pin);
 
+    /**
+      * Puts the component in (or out of) sleep (low power) mode.
+      */
+    virtual int setSleep(bool doSleep) override;
+
 private:
     /**
      * Stop the ADC running, if it is running.
