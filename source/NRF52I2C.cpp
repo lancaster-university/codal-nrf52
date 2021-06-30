@@ -113,7 +113,7 @@ int NRF52I2C::waitForStop(int evt)
 
     while (!nrf_twim_event_check(p_twim, (nrf_twim_event_t)evt))
     {
-        if (nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_ERROR))
+        if (nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_ERROR) || locked > 1000000)
         {
             auto err = p_twim->ERRORSRC;
             p_twim->ERRORSRC = err;
