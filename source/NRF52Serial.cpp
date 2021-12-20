@@ -196,6 +196,7 @@ int NRF52Serial::setBaudrate(uint32_t baudrate)
     switch(baudrate)
     {
         case 9600 : baud = NRF_UARTE_BAUDRATE_9600; break;
+        case 31250 : baud = NRF_UARTE_BAUDRATE_31250; break;
         case 38400 : baud = NRF_UARTE_BAUDRATE_38400; break;
         case 57600 : baud = NRF_UARTE_BAUDRATE_57600; break;
         case 115200 : baud = NRF_UARTE_BAUDRATE_115200; break;
