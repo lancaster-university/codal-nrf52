@@ -40,6 +40,9 @@ class NRF52I2C : public codal::I2C
     int minimumBusIdlePeriod;
 
     int waitForStop(int evt);
+
+    void checkError();
+
 protected:
     NRF52Pin &sda, &scl;
     NRF_TWIM_Type *p_twim;
