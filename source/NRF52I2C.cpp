@@ -106,23 +106,15 @@ int NRF52I2C::setFrequency(uint32_t frequency)
     return DEVICE_OK;
 }
 
-void NRF52I2C::checkError()
+
+inline void clearError(NRF_TWIM_Type *p_twim)
 {
-    int evt = nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_ERROR) ? 1 : 0;
-    auto err = p_twim->ERRORSRC;
-
-    if ( evt)
-        nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_ERROR);
-
-    if ( err)
-        p_twim->ERRORSRC = err;
-
 #if (DEVICE_DMESG_BUFFER_SIZE > 0)
-    if ( evt || err)
-    {
-        DMESG( "NRF52I2C error %d ERRORSRC %x", evt, (unsigned int) err);
-    }
+    if ( nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_ERROR) || p_twim->ERRORSRC)
+        DMESG( "NRF52I2C error %d ERRORSRC %x", nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_ERROR) ? 1 : 0, (unsigned int) p_twim->ERRORSRC);
 #endif
+    p_twim->ERRORSRC = p_twim->ERRORSRC;
+    nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_ERROR);
 }
 
 
@@ -135,15 +127,7 @@ int NRF52I2C::waitForStop(int evt)
     {
         if (nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_ERROR) || locked > 1000000)
         {
-            auto err = p_twim->ERRORSRC;
-            p_twim->ERRORSRC = err;
-
-#if (DEVICE_DMESG_BUFFER_SIZE > 0)
-            DMESG( "NRF52I2C locked %d error %d ERRORSRC %x", locked, nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_ERROR) ? 1 : 0, (unsigned int) err);
-            locked = 0;
-#endif
-
-            nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_ERROR);
+            clearError(p_twim);
             nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_RESUME);
             nrf_twim_task_trigger(p_twim, NRF_TWIM_TASK_STOP);
             res = DEVICE_I2C_ERROR;
@@ -159,7 +143,6 @@ int NRF52I2C::waitForStop(int evt)
                 if (nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_STOPPED))
                 {
                     stopped = true;
-                    DMESG( "NRF52I2C stopped %d", i);
                     break;
                 }
             }
@@ -168,12 +151,6 @@ int NRF52I2C::waitForStop(int evt)
             {
                 // Disable, repeat constructor initialisation, enable.
                 // Takes about 30 microseconds
-#if (DEVICE_DMESG_BUFFER_SIZE > 0)
-                //CODAL_TIMESTAMP r0 = system_timer_current_time_us();
-                //DMESG( "NRF52I2C RECOVERING");
-                locked = 0;
-#endif
-
                 nrf_twim_disable(p_twim);
 
                 // Disable high-side pin drivers on SDA and SCL pins.
@@ -192,12 +169,6 @@ int NRF52I2C::waitForStop(int evt)
                 nrf_twim_pins_set(p_twim, scl.name, sda.name);
                 nrf_twim_frequency_set(p_twim, NRF_TWIM_FREQ_100K);
                 nrf_twim_enable(p_twim);
-
-#if (DEVICE_DMESG_BUFFER_SIZE > 0)
-                //CODAL_TIMESTAMP r1 = system_timer_current_time_us();
-                //DMESG( "NRF52I2C RECOVERED %d us *******************", (int) (r1 - r0));
-                DMESG( "NRF52I2C RECOVERED *****************");
-#endif
             }
             break;
         }
@@ -208,7 +179,6 @@ int NRF52I2C::waitForStop(int evt)
         locked++;
         if (p_twim->EVENTS_TXSTARTED && p_twim->TXD.MAXCNT == 0 && locked >= 100)
         {
-            DMESG( "NRF52I2C zero");
             res = DEVICE_OK;
             break;
         }
@@ -218,34 +188,22 @@ int NRF52I2C::waitForStop(int evt)
         // Appears to only occur under higher levels of background interrupt load.
         if (locked >= 100 && p_twim->EVENTS_LASTTX && (p_twim->SHORTS & NRF_TWIM_SHORT_LASTTX_SUSPEND_MASK) && !p_twim->EVENTS_SUSPENDED)
         {
-            DMESG( "NRF52I2C no suspend");
             p_twim->TASKS_SUSPEND = 1;
             locked = 0;
         }
 
         if (locked >= 100 && p_twim->EVENTS_LASTTX && (p_twim->SHORTS & NRF_TWIM_SHORT_LASTTX_STOP_MASK) && !p_twim->EVENTS_STOPPED)
         {
-            DMESG( "NRF52I2C no stop");
             p_twim->TASKS_STOP = 1;
             locked = 0;
         }
         target_wait_us(10);
     }
 
-#if (DEVICE_DMESG_BUFFER_SIZE > 0)
-    static int maxLocked = 0;
-    if ( locked > maxLocked)
-    {
-        maxLocked = locked;
-        //DMESG( "NRF52I2C maxLocked %d", maxLocked);
-    }
-    DMESG( "NRF52I2C locked %d max %d", locked, maxLocked);
-#endif
-
     if (minimumBusIdlePeriod)
         target_wait_us(minimumBusIdlePeriod);
 
-    checkError();
+    clearError(p_twim);
 
     return res;
 }
@@ -269,15 +227,13 @@ int NRF52I2C::waitForStop(int evt)
  */
 int NRF52I2C::write(uint16_t address, uint8_t *data, int len, bool repeated)
 {
-    DMESG( "NRF52I2C::write");
-    checkError();
+    clearError(p_twim);
 
     address = address >> 1;
 
     nrf_twim_address_set(p_twim, address);
 
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_STOPPED);
-    nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_ERROR);
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_LASTTX);
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_LASTRX);
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_TXSTARTED);
@@ -320,15 +276,13 @@ int NRF52I2C::write(uint16_t address, uint8_t *data, int len, bool repeated)
  */
 int NRF52I2C::read(uint16_t address, uint8_t *data, int len, bool repeated)
 {
-    DMESG( "NRF52I2C::read");
-    checkError();
+    clearError(p_twim);
 
     address = address >> 1;
 
     nrf_twim_address_set(p_twim, address);
 
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_STOPPED);
-    nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_ERROR);
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_LASTTX);
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_LASTRX);
     nrf_twim_event_clear(p_twim, NRF_TWIM_EVENT_TXSTARTED);
