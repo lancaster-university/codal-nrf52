@@ -149,6 +149,7 @@ int NRF52I2C::waitForStop(int evt)
 
             if ( !stopped)
             {
+                // Occasionally RESUME then STOP doesn't trigger STOPPED 
                 // Disable, repeat constructor initialisation, enable.
                 // Takes about 30 microseconds
                 nrf_twim_disable(p_twim);
