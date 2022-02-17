@@ -137,12 +137,13 @@ int NRF52I2C::waitForStop(int evt)
 
             bool stopped = false;
 
-            for ( int i = 0; i < 100; i++)
+            for ( int i = 0; i < 1000000; i++)
             {
                 target_wait_us(10);
                 if (nrf_twim_event_check(p_twim, NRF_TWIM_EVENT_STOPPED))
                 {
                     stopped = true;
+                    DMESG( "NRF52I2C STOPPED %d", i);
                     break;
                 }
             }
@@ -170,6 +171,7 @@ int NRF52I2C::waitForStop(int evt)
                 nrf_twim_pins_set(p_twim, scl.name, sda.name);
                 nrf_twim_frequency_set(p_twim, NRF_TWIM_FREQ_100K);
                 nrf_twim_enable(p_twim);
+                DMESG( "NRF52I2C RECOVERED");
             }
             break;
         }
