@@ -16,6 +16,7 @@ namespace codal
 {
     class NRF52Serial : public Serial
     {
+        volatile int  pauseTxCount;
         volatile bool is_tx_in_progress_;
         volatile int  bytesProcessed;
         uint8_t dmaBuffer[CONFIG_SERIAL_DMA_BUFFER_SIZE];
@@ -76,6 +77,17 @@ namespace codal
           * Puts the component in (or out of) sleep (low power) mode.
           */
         virtual int setSleep(bool doSleep) override;
+
+        /**
+          * Pause transmission of bytes from the TX buffer.
+          * IMPORTANT! When pauseTx(true) has been called, putc() is disabled, and
+          * fibers calling serial.send may block until serial.pauseTx(false) is called.
+          * While transmission is paused, programs should not use serial.send(SYNC_SPINWAIT)
+          * in any fiber, or serial.send(SYNC_SLEEP) in the same fiber that is
+          * calling serial.pauseTx(false) and serial.pauseTx(false),
+          * unless the TX buffer is known to have space.
+          */
+        void pauseTx( bool pause);
 
         ~NRF52Serial();
     };

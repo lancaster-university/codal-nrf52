@@ -15,7 +15,7 @@ extern int8_t target_get_irq_disabled();
  *
  **/
 NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
- : Serial(tx, rx), is_tx_in_progress_(false), bytesProcessed(0), p_uarte_(NULL)
+ : Serial(tx, rx), pauseTxCount(0), is_tx_in_progress_(false), bytesProcessed(0), p_uarte_(NULL)
 {
     if(device != NULL)
         p_uarte_ = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
@@ -125,7 +125,7 @@ void NRF52Serial::_irqHandler(void *self_)
         nrf_uarte_event_clear(p_uarte, NRF_UARTE_EVENT_ENDTX);
 
         self->is_tx_in_progress_ = false;
-        if(self->txBufferedSize() > 0){
+        if( self->pauseTxCount <= 0 && self->txBufferedSize() > 0){
             self->dataTransmitted();
         }else{
             // Transmitter has to be stopped by triggering STOPTX task to achieve
@@ -155,7 +155,7 @@ int NRF52Serial::enableInterrupt(SerialInterruptType t)
             nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STARTRX);
         }           
     }else if(t == TxInterrupt){
-        if(!is_tx_in_progress_ && txBufferedSize())
+        if(!is_tx_in_progress_ && pauseTxCount <= 0 && txBufferedSize())
         {
             // To prevent the same data from being sent by the TX_DONE event
             // of the UARTE interrupt before processing the ring buffer.
@@ -225,6 +225,9 @@ int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 int NRF52Serial::putc(char c)
 {
     int res = DEVICE_OK;
+
+    if (pauseTxCount > 0)
+        return DEVICE_INVALID_STATE;
 
     while(!target_get_irq_disabled() && is_tx_in_progress_);
 
@@ -337,4 +340,29 @@ int NRF52Serial::setSleep(bool doSleep)
     }
    
     return DEVICE_OK;
+}
+
+/**
+  * Pause transmission of bytes from the TX buffer.
+  * IMPORTANT! When pauseTx(true) has been called, putc() is disabled, and
+  * fibers calling serial.send may block until serial.pauseTx(false) is called.
+  * While transmission is paused, programs should not use serial.send(SYNC_SPINWAIT)
+  * in any fiber, or serial.send(SYNC_SLEEP) in the same fiber that is
+  * calling serial.pauseTx(true) and serial.pauseTx(false),
+  * unless the TX buffer is known to have space.
+  */
+void NRF52Serial::pauseTx( bool pause)
+{
+    if ( pause)
+    {
+        pauseTxCount++;
+        if ( pauseTxCount == 1)
+            while ( is_tx_in_progress_) /*wait*/;
+    }
+    else
+    {
+        pauseTxCount--;
+        if ( pauseTxCount == 0)
+            enableInterrupt(TxInterrupt);
+    }
 }
