@@ -654,9 +654,10 @@ int NRF52ADC::getChannelOffset(int channel)
 /**
  * Acquire a new ADC channel, if available, for the given pin.
  * @param pin The pin to attach.
+ * @param activate If the channel should start activated or not.
  * @return a pointer to an NRF52ADCChannel on success, NULL if the given pin does not support analogue input, or if all channels are in use.
  */
-NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
+NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
 {
     int c;
 
@@ -665,14 +666,29 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin)
 
     c = nrf52_saadc_id.get(pin.name) - 1;
 
-    if (!channels[c].isEnabled())
-    {
-        stopRunning();
-        channels[c].enable();
-        startRunning();
-    }
+    if(activate)
+        this->activateChannel(&channels[c]);
 
     return &channels[c];
+}
+
+/**
+ * Activate a ADC channel
+ * @param channel The channel to activate.
+ * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if the given channel does not exist.
+ */
+int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
+{
+    if(channel==NULL)
+        return DEVICE_INVALID_PARAMETER;
+
+    if (!channel->isEnabled())
+    {
+        stopRunning();
+        channel->enable();
+        startRunning();
+    }
+    return DEVICE_OK;
 }
 
 /**
