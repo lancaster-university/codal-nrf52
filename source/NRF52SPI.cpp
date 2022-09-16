@@ -44,7 +44,7 @@ namespace codal
  * Constructor.
  */
 NRF52SPI::NRF52SPI(Pin &mosi, Pin &miso, Pin &sclk, NRF_SPIM_Type *device)
-    : codal::SPI(), mosi(mosi), miso(miso), sck(sclk)
+    : codal::SPI(), mosi(&mosi), miso(&miso), sck(&sclk)
 {
     if (device == NULL)
         p_spim = (NRF_SPIM_Type *)allocate_peripheral(PERI_MODE_SPIM);
@@ -149,25 +149,25 @@ void NRF52SPI::config()
         return;
     configured = 1;
 
-    setDrive(&sck);
-    setDrive(&mosi);
+    setDrive(sck);
+    setDrive(mosi);
     uint32_t mosi_pin = 0xffffffff;
     uint32_t miso_pin = 0xffffffff;
     uint32_t sck_pin = 0xffffffff;
-    if (&mosi)
+    if (mosi)
     {
-        mosi.setDigitalValue(0);
-        mosi_pin = mosi.name;
+        mosi->setDigitalValue(0);
+        mosi_pin = mosi->name;
     }
     if (&miso)
     {
-        miso.getDigitalValue();
-        miso_pin = miso.name;
+        miso->getDigitalValue();
+        miso_pin = miso->name;
     }
     if (&sck)
     {
-        sck.setDigitalValue(mode <= 1 ? 0 : 1);
-        sck_pin = sck.name;
+        sck->setDigitalValue(mode <= 1 ? 0 : 1);
+        sck_pin = sck->name;
     }
 
     nrf_spim_disable(p_spim);
@@ -261,4 +261,25 @@ int NRF52SPI::write(int data)
     int ret = xfer(&sendCh, 1, &recvCh, 1, NULL, NULL);
     return (ret < 0) ? (int)DEVICE_SPI_ERROR : recvCh;
 }
+
+/**
+ * Change the pins used by this I2C peripheral to those provided.
+ *
+ * @param mosi the Pin to use for the SPI input line.
+ * @param miso the Pin to use for the SPI output line.
+ * @param sclk the Pin to use for the SPI clock line.
+ * @return DEVICE_OK on success, or DEVICE_NOT_IMPLEMENTED / DEVICE_NOT_SUPPORTED if the request cannot be performed.
+ */
+int NRF52SPI::redirect(Pin &mosi, Pin &miso, Pin &sclk)
+{
+    reassignPin(&this->mosi, &mosi);
+    reassignPin(&this->miso, &miso);
+    reassignPin(&this->sck, &sclk);
+
+    configured = 0;
+    config();
+
+    return DEVICE_OK;
+}
+
 } // namespace codal

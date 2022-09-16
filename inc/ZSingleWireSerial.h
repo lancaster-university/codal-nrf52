@@ -28,6 +28,7 @@ namespace codal
 
         virtual void configureRxInterrupt(int enable);
         virtual void configureTxInterrupt(int enable);
+        virtual int releasePin(Pin &pin);
 
         ZSingleWireSerial(Pin& p);
 

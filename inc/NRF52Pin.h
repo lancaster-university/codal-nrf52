@@ -73,7 +73,7 @@ namespace codal
         static int8_t pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE];
         static uint8_t lastUsedChannel;
 
-        void* obj;
+        PinPeripheral* obj;
 
 
         /**
@@ -109,6 +109,11 @@ namespace codal
         int disableEvents();
 
         public:
+
+        /**
+          * Record that a given peripheral has been connected to this pin.
+          */
+        virtual void connect(PinPeripheral &p, bool deleteOnRelease = false) override;
 
         /**
           * Disconnect any attached mBed IO from this pin.

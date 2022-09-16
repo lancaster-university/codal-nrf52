@@ -163,10 +163,47 @@ NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pi
 }
 
 /**
-  * Disconnect any attached mBed IO from this pin.
+ * Record that a given peripheral has been connected to this pin.
+ */
+void NRF52Pin::connect(PinPeripheral &p, bool deleteOnRelease)
+{
+    if (obj != NULL)
+        disconnect();
+
+    Pin::connect(p, deleteOnRelease);
+    obj = &p;
+}
+
+/**
+  * Disconnect any attached peripherals from this pin.
   *
   * Used only when pin changes mode (i.e. Input/Output/Analog/Digital)
+  *
+  * TODO: Update release code for ADC, PWM, I2C, SPI
   */
+void NRF52Pin::disconnect()
+{
+    // Detach any on chip peripherals attached to this pin.
+    if (obj)
+        obj->releasePin(*this);
+
+    // If we have previously allocated a PWM channel to this pin through setAnalogValue(), mark that PWM channel as free for future allocation.
+    if (obj == pwm)
+    {
+        for (int i = 0; i < NRF52PWM_PWM_CHANNELS; i++)
+            if (pwmChannelMap[i] == name)
+                pwmChannelMap[i] = -1;
+    }
+
+    // Disable any interrupts that may be attached to the pin GPIO state.
+    PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
+
+    // Reset status flags to zero, but retain preferred TouchSense, Polarity and wake modes.
+    obj = NULL;
+    status &= IO_STATUS_MODES;
+}
+
+#ifdef ORIGINAL_DISCONNECT_CODE
 void NRF52Pin::disconnect()
 {
     if (status & IO_STATUS_ANALOG_OUT)
@@ -180,7 +217,7 @@ void NRF52Pin::disconnect()
             {
                 NRF52PWM::nrf52_pwm_driver[p]->disconnectPin(*this);
 
-                // If this pin was attaced to the analog funcitons in this class, clear any cached state.
+                // If this pin was attaced to the analog functions in this class, clear any cached state.
                 if ( NRF52PWM::nrf52_pwm_driver[p] == pwm)
                     for (int i = 0; i < NRF52PWM_PWM_CHANNELS; i++)
                         if (pwmChannelMap[i] == name)
@@ -222,6 +259,7 @@ void NRF52Pin::disconnect()
     obj = NULL;
     status &= IO_STATUS_MODES;
 }
+#endif
 
 /**
   * Configures this IO pin as a digital output (if necessary) and sets the pin to 'value'.
@@ -575,7 +613,7 @@ int NRF52Pin::isTouched(TouchMode touchMode)
 
         if (touchMode == TouchMode::Capacitative)
         {
-            obj = new TouchButton(*this, *touchSensor, CAPTOUCH_DEFAULT_CALIBRATION);
+            connect(*new TouchButton(*this, *touchSensor, CAPTOUCH_DEFAULT_CALIBRATION), true);
             status |= IO_STATUS_CAPACITATIVE_TOUCH;
         }
         else
@@ -584,7 +622,7 @@ int NRF52Pin::isTouched(TouchMode touchMode)
             getDigitalValue();
 
             // Connect to a new Button instance.
-            obj = new Button(*this, id, DEVICE_BUTTON_ALL_EVENTS, ACTIVE_LOW, PullMode::None);
+            connect(*new Button(*this, id, DEVICE_BUTTON_ALL_EVENTS, ACTIVE_LOW, PullMode::None), true);
             status &= ~IO_STATUS_CAPACITATIVE_TOUCH;
         }
 
@@ -805,10 +843,10 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
     if (!(status & IO_STATUS_EVENT_PULSE_ON_EDGE) && eventType == DEVICE_PIN_EVENT_ON_PULSE)
         enablePulseIn = true;
 
-    // If we're moving out of pulse on edge mode (into plain edge detect mode), turn stop the pulse detecor.
+    // If we're moving out of pulse on edge mode (into plain edge detect mode), turn off the pulse detecor.
     if ((status & IO_STATUS_EVENT_PULSE_ON_EDGE) && eventType != DEVICE_PIN_EVENT_ON_PULSE)
     {
-        delete ((PulseIn *)obj);
+        obj->releasePin(*this);
         obj = NULL;
     }
 
@@ -829,7 +867,7 @@ int NRF52Pin::enableRiseFallEvents(int eventType)
         // Set the initial pulse edge to the current time in case the line is currently active.
         PulseIn *p = new PulseIn(*this);
         p->lastEdge = system_timer_current_time_us();
-        obj = (void *) p;
+        connect(*p, true);
     }
 
     return DEVICE_OK;

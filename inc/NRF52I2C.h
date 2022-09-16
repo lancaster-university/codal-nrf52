@@ -41,7 +41,7 @@ class NRF52I2C : public codal::I2C
 
     int waitForStop(int evt);
 protected:
-    NRF52Pin &sda, &scl;
+    NRF52Pin *sda, *scl;
     NRF_TWIM_Type *p_twim;
 public:
     /**
@@ -49,11 +49,34 @@ public:
      */
     NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device = NULL);
 
+    /**
+     * Destructor.
+     */
+    virtual ~NRF52I2C();
+
     /** Set the frequency of the I2C interface
      *
      * @param frequency The bus frequency in hertz
      */
     virtual int setFrequency(uint32_t frequency);
+
+    /**
+      * Change the pins used by this I2C peripheral to those provided.
+      *
+      * @param sda the Pin to use for the I2C SDA line.
+      * @param scl the Pin to use for the I2C SCL line.
+      * @return DEVICE_OK on success, or DEVICE_NOT_IMPLEMENTED / DEVICE_NOT_SUPPORTED if the request cannot be performed.
+      */
+    virtual int redirect(NRF52Pin &sda, NRF52Pin &scl);
+
+    /**
+      * Method to release the given pin from a peripheral, if already bound.
+      * Device drivers should override this method to disconnect themselves from the give pin
+      * to allow it to be used by a different peripheral.
+      *
+      * @param pin the Pin to be released
+      */
+    virtual int releasePin(Pin &pin) override;
 
     /**
     * Issues a standard, I2C command write to the I2C bus.
