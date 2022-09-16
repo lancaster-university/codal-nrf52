@@ -192,7 +192,7 @@ public:
 #define NRF52ADC_STATUS_PERIOD_CHANGED              0x01        // Indicates that the period of the ADC may have changed.
 
 
-class NRF52ADC : public CodalComponent
+class NRF52ADC : public CodalComponent, public PinPeripheral
 {
 
 public:
@@ -302,6 +302,15 @@ public:
      * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if the given pin was not connected to the ADC.
      */
     int releaseChannel(Pin& pin);
+
+    /**
+    * Method to release the given pin from a peripheral, if already bound.
+    * Device drivers should override this method to disconnect themselves from the give pin
+    * to allow it to be used by a different peripheral.
+    *
+    * @param pin the Pin to be released
+    */
+    virtual int releasePin(Pin &pin) override;
 
     /**
       * Puts the component in (or out of) sleep (low power) mode.

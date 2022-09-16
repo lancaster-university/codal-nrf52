@@ -39,9 +39,9 @@ namespace codal
  */
 class NRF52SPI : public codal::SPI
 {
-    codal::Pin &mosi;
-    codal::Pin &miso;
-    codal::Pin &sck;
+    codal::Pin *mosi;
+    codal::Pin *miso;
+    codal::Pin *sck;
     nrf_spim_frequency_t freq;
     IRQn_Type IRQn;
     uint8_t mode;
@@ -119,6 +119,16 @@ public:
      */
     virtual int startTransfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
                          uint32_t rxSize, PVoidCallback doneHandler, void *arg);
+
+    /**
+      * Change the pins used by this I2C peripheral to those provided.
+      *
+      * @param mosi the Pin to use for the SPI input line.
+      * @param miso the Pin to use for the SPI output line.
+      * @param sclk the Pin to use for the SPI clock line.
+      * @return DEVICE_OK on success, or DEVICE_NOT_IMPLEMENTED / DEVICE_NOT_SUPPORTED if the request cannot be performed.
+      */
+    virtual int redirect(Pin &mosi, Pin &miso, Pin &sclk) override;
 };
 }
 

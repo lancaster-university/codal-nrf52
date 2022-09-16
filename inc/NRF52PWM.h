@@ -18,7 +18,7 @@
 
 using namespace codal;
 
-class NRF52PWM : public CodalComponent, public DataSink
+class NRF52PWM : public CodalComponent, public DataSink, public PinPeripheral
 {
 
 private:
@@ -134,11 +134,17 @@ public:
     int
     connectPin(Pin &pin, int channel);
 
-    /**
-     * Disconnect the given pin from any PWM channels it has allocated.
-     */
-    int
-    disconnectPin(Pin &pin);
+   /**
+    * Method to release the given pin from a peripheral, if already bound.
+    * Device drivers should override this method to disconnect themselves from the give pin
+    * to allow it to be used by a different peripheral.
+    *
+    * @param pin the Pin to be released
+    */
+    virtual int releasePin(Pin &pin) override;
+
+    // Backward compat - deprecated.
+    int disconnectPin(Pin &pin);
 
     private:
     /**

@@ -666,8 +666,10 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
 
     c = nrf52_saadc_id.get(pin.name) - 1;
 
-    if(activate)
+    if(activate){
         this->activateChannel(&channels[c]);
+        pin.connect(*this);
+    }
 
     return &channels[c];
 }
@@ -712,6 +714,31 @@ int NRF52ADC::releaseChannel(Pin& pin)
         if (wasRunning)
             startRunning();
     }
+    return DEVICE_OK;
+}
+
+/**
+* Method to release the given pin from a peripheral, if already bound.
+* Device drivers should override this method to disconnect themselves from the give pin
+* to allow it to be used by a different peripheral.
+*
+* @param pin the Pin to be released
+*/
+int
+NRF52ADC::releasePin(Pin &pin)
+{
+    NRF52ADCChannel *c = getChannel(pin);
+
+    if (c != NULL)
+    {
+        // Release the ADC channel, and wait for it to be fully disabled before continuing.
+        releaseChannel(pin);
+        while(c->isEnabled());
+    }
+
+    if (deleteOnRelease)
+        delete this;
+
     return DEVICE_OK;
 }
 

@@ -21,9 +21,11 @@ using namespace codal;
 /**
  * Constructor.
  */
-NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal::I2C(sda, scl), sda(sda), scl(scl)
+NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal::I2C(sda, scl)
 {
     minimumBusIdlePeriod = 0;
+    this->sda = NULL;
+    this->scl = NULL;
 
 #ifdef NRF52I2C_BUS_IDLE_PERIOD
     minimumBusIdlePeriod = NRF52I2C_BUS_IDLE_PERIOD;
@@ -37,24 +39,7 @@ NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal:
     if (!p_twim)
         target_panic(DEVICE_HARDWARE_CONFIGURATION_ERROR);
 
-    // Disable high-side pin drivers on SDA and SCL pins.
-    sda.setDriveMode(6);
-    scl.setDriveMode(6);
-
-    // Ensure all I2C drivers on the bus are fully reset
-    clearBus();
-
-    // put pins in input mode
-    sda.getDigitalValue(PullMode::Up);
-    scl.getDigitalValue(PullMode::Up);
-
-    target_wait_us(10);
-
-    nrf_twim_pins_set(p_twim, scl.name, sda.name);
-    nrf_twim_frequency_set(p_twim, NRF_TWIM_FREQ_100K);
-    nrf_twim_enable(p_twim);
-
-    target_wait_us(10);
+    redirect(sda, scl);
 }
 
 /**
@@ -62,31 +47,34 @@ NRF52I2C::NRF52I2C(NRF52Pin &sda, NRF52Pin &scl, NRF_TWIM_Type *device) : codal:
  * https://github.com/NordicSemiconductor/Nordic-Thingy52-FW/blob/126120108879d5bf5d202c9d5cab65e4e9041f58/external/sdk13/components/drivers_nrf/twi_master/nrf_drv_twi.c#L203
  */
 void NRF52I2C::clearBus() {
-    scl.setDigitalValue(1);
-    sda.setDigitalValue(1);
-
-    target_wait_us(4);
-
-    for (int i = 0; i < 9; i++)
+    if(this->sda && this->scl)
     {
-        if (sda.getDigitalValue(PullMode::Up))
+        scl->setDigitalValue(1);
+        sda->setDigitalValue(1);
+
+        target_wait_us(4);
+
+        for (int i = 0; i < 9; i++)
         {
-            if (i == 0)
-                return;
-            else
-                break;
+            if (sda->getDigitalValue(PullMode::Up))
+            {
+                if (i == 0)
+                    return;
+                else
+                    break;
+            }
+
+            scl->setDigitalValue(0);
+            target_wait_us(4);
+
+            scl->setDigitalValue(1);
+            target_wait_us(4);
         }
-
-        scl.setDigitalValue(0);
+        sda->setDigitalValue(0);
         target_wait_us(4);
-
-        scl.setDigitalValue(1);
-        target_wait_us(4);
+        
+        sda->setDigitalValue(1);
     }
-    sda.setDigitalValue(0);
-    target_wait_us(4);
-    
-    sda.setDigitalValue(1);
 }
 
 
@@ -113,6 +101,68 @@ int NRF52I2C::setFrequency(uint32_t frequency)
 #endif
 
     nrf_twim_enable(p_twim);
+
+    return DEVICE_OK;
+}
+
+/**
+ * Change the pins used by this I2C peripheral to those provided.
+ *
+ * @param sda the Pin to use for the I2C SDA line.
+ * @param scl the Pin to use for the I2C SCL line.
+ * @return DEVICE_OK on success, or DEVICE_NOT_IMPLEMENTED / DEVICE_NOT_SUPPORTED if the request cannot be performed.
+ */
+int NRF52I2C::redirect(NRF52Pin &sda, NRF52Pin &scl)
+{
+    reassignPin(&this->sda, &sda);
+    reassignPin(&this->scl, &scl);
+
+    nrf_twim_disable(p_twim);
+
+    if (this->sda && this->scl)
+    {
+        // Disable high-side pin drivers on SDA and SCL pins.
+        this->sda->setDriveMode(6);
+        this->scl->setDriveMode(6);
+
+        // Ensure all I2C drivers on the bus are fully reset
+        clearBus();
+
+        // put pins in input mode
+        this->sda->getDigitalValue(PullMode::Up);
+        this->scl->getDigitalValue(PullMode::Up);
+    }
+
+    target_wait_us(10);
+
+    nrf_twim_pins_set(p_twim, this->scl ? this->scl->name : 0xFFFFFFFF, this->sda ? this->sda->name : 0xFFFFFFFF);
+    nrf_twim_frequency_set(p_twim, NRF_TWIM_FREQ_100K);
+    nrf_twim_enable(p_twim);
+
+    target_wait_us(10);
+
+
+    return DEVICE_OK;
+}
+
+/**
+ * Method to release the given pin from a peripheral, if already bound.
+ * Device drivers should override this method to disconnect themselves from the give pin
+ * to allow it to be used by a different peripheral.
+ *
+ * @param pin the Pin to be released.
+ * @return DEVICE_OK on success, or DEVICE_NOT_IMPLEMENTED if unsupported, or DEVICE_INVALID_PARAMETER if the pin is not bound to this peripheral.
+ */
+int NRF52I2C::releasePin(Pin &pin)
+{
+    // We've been asked to disconnect from the given pin.
+    // We don't support having half an I2C bus, so disconnect all pins from the peripheral.
+
+    if (sda == &pin || scl == &pin)
+        redirect(*(NRF52Pin *)NULL, *(NRF52Pin *)NULL);
+
+    if (deleteOnRelease)
+        delete this;
 
     return DEVICE_OK;
 }
@@ -149,30 +199,11 @@ int NRF52I2C::waitForStop(int evt)
                 }
             }
 
+            // Occasionally RESUME then STOP doesn't trigger STOPPED 
+            // Disable, repeat constructor initialisation, enable.
             if ( !stopped)
-            {
-                // Occasionally RESUME then STOP doesn't trigger STOPPED 
-                // Disable, repeat constructor initialisation, enable.
-                // Takes about 30 microseconds
-                nrf_twim_disable(p_twim);
+                redirect(*this->sda, *this->scl);
 
-                // Disable high-side pin drivers on SDA and SCL pins.
-                sda.setDriveMode(6);
-                scl.setDriveMode(6);
-
-                // Ensure all I2C drivers on the bus are fully reset
-                clearBus();
-
-                // put pins in input mode
-                sda.getDigitalValue(PullMode::Up);
-                scl.getDigitalValue(PullMode::Up);
-
-                target_wait_us(10);
-
-                nrf_twim_pins_set(p_twim, scl.name, sda.name);
-                nrf_twim_frequency_set(p_twim, NRF_TWIM_FREQ_100K);
-                nrf_twim_enable(p_twim);
-            }
             break;
         }
 
@@ -364,4 +395,11 @@ int NRF52I2C::setBusIdlePeriod(int period)
 
     minimumBusIdlePeriod = period;
     return DEVICE_OK;
+}
+
+/**
+ * Destructor
+ */
+NRF52I2C::~NRF52I2C()
+{
 }

@@ -362,22 +362,33 @@ NRF52PWM::connectPin(Pin &pin, int channel)
     pin.disconnect();
     pin.setDigitalValue(0);
     PWM.PSEL.OUT[channel] = pin.name;
-    pin.disconnect();
+    pin.connect(*this);
 
     pin.status |= IO_STATUS_ANALOG_OUT;
     return DEVICE_OK;
 }
 
 /**
- * Direct output of given PWM channel to the given pin
- */
+* Method to release the given pin from a peripheral, if already bound.
+* Device drivers should override this method to disconnect themselves from the give pin
+* to allow it to be used by a different peripheral.
+*
+* @param pin the Pin to be released
+*/
 int
-NRF52PWM::disconnectPin(Pin &pin)
+NRF52PWM::releasePin(Pin &pin)
 {
     for (int channel = 0; channel < NRF52PWM_PWM_CHANNELS; channel++)
         if (PWM.PSEL.OUT[channel] == pin.name)
             PWM.PSEL.OUT[channel] = 0xFFFFFFFF;
 
-    pin.status &= ~IO_STATUS_ANALOG_OUT;
+    if (deleteOnRelease)
+        delete this;
+
     return DEVICE_OK;
+}
+
+int NRF52PWM::disconnectPin(Pin &pin)
+{
+    return releasePin(pin);
 }

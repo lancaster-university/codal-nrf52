@@ -119,6 +119,25 @@ int ZSingleWireSerial::configureRx(int enable)
     return DEVICE_OK;
 }
 
+/**
+ * Method to release the given pin from a peripheral, if already bound.
+ * Device drivers should override this method to disconnect themselves from the give pin
+ * to allow it to be used by a different peripheral.
+ *
+ * @param pin the Pin to be released.
+ * @return DEVICE_OK on success, or DEVICE_NOT_IMPLEMENTED if unsupported, or DEVICE_INVALID_PARAMETER if the pin is not bound to this peripheral.
+ */
+int ZSingleWireSerial::releasePin(Pin &pin)
+{
+    configureRx(false);
+    configureTx(false);
+    
+    if (deleteOnRelease)
+        delete this;
+
+    return DEVICE_OK;
+}
+
 ZSingleWireSerial::ZSingleWireSerial(Pin& p) : DMASingleWireSerial(p)
 {
     uart = (NRF_UARTE_Type*)allocate_peripheral(PERI_MODE_UARTE);
