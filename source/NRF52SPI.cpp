@@ -147,7 +147,10 @@ void NRF52SPI::config()
 {
     if (configured)
         return;
+
     configured = 1;
+
+    setPinLock(true);
 
     setDrive(sck);
     setDrive(mosi);
@@ -181,6 +184,8 @@ void NRF52SPI::config()
     NVIC_SetPriority(IRQn, 7);
     NVIC_ClearPendingIRQ(IRQn);
     NVIC_EnableIRQ(IRQn);
+
+    setPinLock(true);
 
     DMESG("SPI config done f=%p", freq);
 }

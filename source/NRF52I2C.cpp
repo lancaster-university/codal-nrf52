@@ -114,6 +114,7 @@ int NRF52I2C::setFrequency(uint32_t frequency)
  */
 int NRF52I2C::redirect(NRF52Pin &sda, NRF52Pin &scl)
 {
+    DMESG("I2C::redirect [this:%p] [this->sda:%p[%p]] [this->scl:%p[%p]] [sda:%p] [scl:%p]", this, &this->sda, this->sda, &this->scl, this->scl, &sda, &scl);
     reassignPin(&this->sda, &sda);
     reassignPin(&this->scl, &scl);
 
@@ -121,6 +122,9 @@ int NRF52I2C::redirect(NRF52Pin &sda, NRF52Pin &scl)
 
     if (this->sda && this->scl)
     {
+        // Maintain our binding whilst we use the Pin:: IO operations...
+        setPinLock(true);
+
         // Disable high-side pin drivers on SDA and SCL pins.
         this->sda->setDriveMode(6);
         this->scl->setDriveMode(6);
@@ -129,8 +133,12 @@ int NRF52I2C::redirect(NRF52Pin &sda, NRF52Pin &scl)
         clearBus();
 
         // put pins in input mode
+
         this->sda->getDigitalValue(PullMode::Up);
         this->scl->getDigitalValue(PullMode::Up);
+
+        // We're done.
+        setPinLock(false);
     }
 
     target_wait_us(10);
