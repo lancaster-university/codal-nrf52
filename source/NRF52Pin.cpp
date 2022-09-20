@@ -167,9 +167,17 @@ NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pi
  */
 void NRF52Pin::connect(PinPeripheral &p, bool deleteOnRelease)
 {
-    if (obj != NULL)
-        disconnect();
+    DMESG("PIN::connect [this:%p] [obj:%p], [deleteOnRelease:%d]", this, obj, deleteOnRelease);
 
+    // If we're already attached to a peripheral and we're being asked to connect to a new one,
+    // then attempt to release the old peripheral.
+    if (obj && obj != &p)
+    {
+        DMESG("PIN:: Disconnecting [this:%p]", this);
+        disconnect();
+    }
+
+    DMESG("PIN:: Connected [this:%p] [obj:%p]", this, &p);
     Pin::connect(p, deleteOnRelease);
     obj = &p;
 }
@@ -184,7 +192,7 @@ void NRF52Pin::connect(PinPeripheral &p, bool deleteOnRelease)
 void NRF52Pin::disconnect()
 {
     // Detach any on chip peripherals attached to this pin.
-    if (obj)
+    if (obj && !obj->isPinLocked())
         obj->releasePin(*this);
 
     // If we have previously allocated a PWM channel to this pin through setAnalogValue(), mark that PWM channel as free for future allocation.
