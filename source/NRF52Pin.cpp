@@ -167,19 +167,22 @@ NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pi
  */
 void NRF52Pin::connect(PinPeripheral &p, bool deleteOnRelease)
 {
-    DMESG("PIN::connect [this:%p] [obj:%p], [deleteOnRelease:%d]", this, obj, deleteOnRelease);
-
     // If we're already attached to a peripheral and we're being asked to connect to a new one,
     // then attempt to release the old peripheral.
-    if (obj && obj != &p)
+ 
+    if (obj != &p)
     {
-        DMESG("PIN:: Disconnecting [this:%p]", this);
-        disconnect();
-    }
+        DMESG("PIN::connect [this:%p] [obj:%p], [deleteOnRelease:%d]", this, obj, deleteOnRelease);
+        if(obj)
+        {
+            DMESG("PIN:: Disconnecting [this:%p]", this);
+            disconnect();
+        }
 
-    DMESG("PIN:: Connected [this:%p] [obj:%p]", this, &p);
-    Pin::connect(p, deleteOnRelease);
-    obj = &p;
+        DMESG("PIN:: Connecting [this:%p] [obj:%p]", this, &p);
+        Pin::connect(p, deleteOnRelease);
+        obj = &p;
+    }
 }
 
 /**
@@ -191,16 +194,24 @@ void NRF52Pin::connect(PinPeripheral &p, bool deleteOnRelease)
   */
 void NRF52Pin::disconnect()
 {
-    // Detach any on chip peripherals attached to this pin.
-    if (obj && !obj->isPinLocked())
-        obj->releasePin(*this);
+    DMESG("PIN::disconnect [this:%p] [obj:%p]", this, obj);
 
-    // If we have previously allocated a PWM channel to this pin through setAnalogValue(), mark that PWM channel as free for future allocation.
-    if (obj == pwm)
+    // Detach any on chip peripherals attached to this pin.
+    if (obj)
     {
-        for (int i = 0; i < NRF52PWM_PWM_CHANNELS; i++)
-            if (pwmChannelMap[i] == name)
-                pwmChannelMap[i] = -1;
+        if (!obj->isPinLocked())
+        {
+            DMESG("RELEASING PIN: %p", obj);
+            obj->releasePin(*this);
+        }
+
+        // If we have previously allocated a PWM channel to this pin through setAnalogValue(), mark that PWM channel as free for future allocation.
+        if (obj == pwm)
+        {
+            for (int i = 0; i < NRF52PWM_PWM_CHANNELS; i++)
+                if (pwmChannelMap[i] == name)
+                    pwmChannelMap[i] = -1;
+        }
     }
 
     // Disable any interrupts that may be attached to the pin GPIO state.
@@ -284,7 +295,7 @@ void NRF52Pin::disconnect()
   */
 int NRF52Pin::setDigitalValue(int value)
 {
-    if (status & IO_STATUS_DIGITAL_OUT)
+    if ((status & IO_STATUS_DIGITAL_OUT) && (!obj || obj->isPinLocked()))
     {
         if (value)
             PORT->OUTSET = 1 << PIN;
@@ -294,15 +305,8 @@ int NRF52Pin::setDigitalValue(int value)
         return DEVICE_OK;
     }
 
-    // Optimisation: Permit fast changes between digital in and digital out, given its common use case.
-    // we also preserve any interrupt status, pulse measurement events etc.
-    if (status & IO_STATUS_DIGITAL_IN)
-    {
-        PORT->PIN_CNF[PIN] |= 2;
-        status &= ~IO_STATUS_DIGITAL_IN;
-    }
-    else
-        disconnect();
+    // We're changing mode. reset to a known state.
+    disconnect();
 
     if (value)
         PORT->OUTSET = 1 << PIN;
@@ -332,13 +336,11 @@ int NRF52Pin::getDigitalValue()
 {
     // Optimisation: Permit fast changes between digital in and digital out, given its common use case.
     // we also preserve any interrupt status, pulse measurement events etc.
-    if (status & IO_STATUS_DIGITAL_IN)
+    if ((status & IO_STATUS_DIGITAL_IN) && (!obj || obj->isPinLocked()))
         return (PORT->IN & (1 << PIN)) ? 1 : 0;
 
-    if (status & IO_STATUS_DIGITAL_OUT)
-        status &= ~IO_STATUS_DIGITAL_OUT;
-    else
-        disconnect();
+    // We're changing mode. reset to a known state.
+    disconnect();
 
     // Enable input mode, and input buffer
     PORT->PIN_CNF[PIN] &= 0xfffffffc;
@@ -409,6 +411,9 @@ int NRF52Pin::setAnalogValue(int value)
     if(value < 0 || value > DEVICE_PIN_MAX_OUTPUT)
          return DEVICE_INVALID_PARAMETER;
 
+    if (!(status & IO_STATUS_ANALOG_OUT))
+        disconnect();
+
     int channel = -1;
 
     // find existing channel
@@ -428,7 +433,8 @@ int NRF52Pin::setAnalogValue(int value)
         pwm->connectPin(*this, channel);
     }
 
-    status |= IO_STATUS_ANALOG_OUT;
+    if (obj == NULL || obj->isPinLocked() == false)
+        status |= IO_STATUS_ANALOG_OUT;
 
     // set new value
     pwmBuffer[channel] = (int)((float)pwm->getSampleRange() * (1 - (float)value / (float)(DEVICE_PIN_MAX_OUTPUT+1)));
@@ -499,17 +505,19 @@ int NRF52Pin::getAnalogValue()
 
     // Move into an analogue input state if necessary.
     if (!(status & IO_STATUS_ANALOG_IN))
-    {
-         disconnect();
-         status |= IO_STATUS_ANALOG_IN;
-    }
+        disconnect();
 
     if (adc)
     {
         NRF52ADCChannel *c = adc->getChannel(*this);
 
         if (c)
+        {
+            if (obj == NULL || obj->isPinLocked() == false)
+                status |= IO_STATUS_ANALOG_IN;
+   
             return c->getSample() / 16;
+        }
     }
 
     return DEVICE_NOT_SUPPORTED;
@@ -615,6 +623,8 @@ int NRF52Pin::isTouched(TouchMode touchMode)
     // Move into a touch input state if necessary.
     TouchMode currentTouchMode = (status & IO_STATUS_CAPACITATIVE_TOUCH) ? TouchMode::Capacitative : TouchMode::Resistive;
 
+    DMESG("NRF52Pin::isTouched(%s) [%s] [%d]", touchMode==TouchMode::Capacitative ? "Capacitative" : "Resistive", currentTouchMode==TouchMode::Capacitative ? "Capacitative" : "Resistive", status & IO_STATUS_TOUCH_IN ? 1 : 0 );
+
     if ((status & IO_STATUS_TOUCH_IN) == 0 || touchMode != currentTouchMode)
     {
         disconnect();
@@ -634,8 +644,10 @@ int NRF52Pin::isTouched(TouchMode touchMode)
             status &= ~IO_STATUS_CAPACITATIVE_TOUCH;
         }
 
-        status |= IO_STATUS_TOUCH_IN;
+        status |= (IO_STATUS_TOUCH_IN | IO_STATUS_DIGITAL_IN);
     }
+
+    DMESG("NRF52Pin::/isTouched(%s) [%s] [%d]", touchMode==TouchMode::Capacitative ? "Capacitative" : "Resistive", currentTouchMode==TouchMode::Capacitative ? "Capacitative" : "Resistive", status & IO_STATUS_TOUCH_IN ? 1 : 0 );
 
     if (touchMode == TouchMode::Capacitative)
         return ((TouchButton *)obj)->isPressed();

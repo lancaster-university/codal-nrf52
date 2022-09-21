@@ -152,6 +152,9 @@ void NRF52SPI::config()
 
     setPinLock(true);
 
+    DMESG("NRF52SPI: Updating CONFIG...");
+    nrf_spim_disable(p_spim);
+
     setDrive(sck);
     setDrive(mosi);
     uint32_t mosi_pin = 0xffffffff;
@@ -160,20 +163,24 @@ void NRF52SPI::config()
     if (mosi)
     {
         mosi->setDigitalValue(0);
+        mosi->setPull(mode <= 1 ? PullMode::Down : PullMode::Up);
         mosi_pin = mosi->name;
+        DMESG("NRF52SPI: Updating CONFIG... MOSI set: %p", mosi_pin);
     }
-    if (&miso)
+    if (miso)
     {
         miso->getDigitalValue();
+        miso->setPull(mode <= 1 ? PullMode::Down : PullMode::Up);
         miso_pin = miso->name;
+        DMESG("NRF52SPI: Updating CONFIG... MISO set: %p", miso_pin);
     }
-    if (&sck)
+    if (sck)
     {
         sck->setDigitalValue(mode <= 1 ? 0 : 1);
         sck_pin = sck->name;
+        DMESG("NRF52SPI: Updating CONFIG... SCK set: %p", sck_pin);
     }
 
-    nrf_spim_disable(p_spim);
     nrf_spim_pins_set(p_spim, sck_pin, mosi_pin, miso_pin);
     nrf_spim_frequency_set(p_spim, (nrf_spim_frequency_t)freq);
     nrf_spim_configure(p_spim, (nrf_spim_mode_t)mode, NRF_SPIM_BIT_ORDER_MSB_FIRST);
@@ -187,7 +194,7 @@ void NRF52SPI::config()
 
     setPinLock(true);
 
-    DMESG("SPI config done f=%p", freq);
+    DMESG("SPI config done f=%d", freq);
 }
 
 /** Set the frequency of the SPI interface
