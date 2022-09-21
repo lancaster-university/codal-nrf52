@@ -727,8 +727,9 @@ int NRF52ADC::releaseChannel(Pin& pin)
 int
 NRF52ADC::releasePin(Pin &pin)
 {
-    NRF52ADCChannel *c = getChannel(pin);
+    NRF52ADCChannel *c = getChannel(pin, false);
 
+    DMESG("NRF52ADC:: Releasing Pin");
     if (c != NULL)
     {
         // Release the ADC channel, and wait for it to be fully disabled before continuing.
