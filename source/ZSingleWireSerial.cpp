@@ -131,7 +131,7 @@ int ZSingleWireSerial::releasePin(Pin &pin)
 {
     configureRx(false);
     configureTx(false);
-    
+
     if (deleteOnRelease)
         delete this;
 

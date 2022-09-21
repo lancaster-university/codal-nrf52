@@ -72,7 +72,7 @@ void NRF52I2C::clearBus() {
         }
         sda->setDigitalValue(0);
         target_wait_us(4);
-        
+
         sda->setDigitalValue(1);
     }
 }
@@ -114,7 +114,6 @@ int NRF52I2C::setFrequency(uint32_t frequency)
  */
 int NRF52I2C::redirect(NRF52Pin &sda, NRF52Pin &scl)
 {
-    DMESG("I2C::redirect [this:%p] [this->sda:%p[%p]] [this->scl:%p[%p]] [sda:%p] [scl:%p]", this, &this->sda, this->sda, &this->scl, this->scl, &sda, &scl);
     reassignPin(&this->sda, &sda);
     reassignPin(&this->scl, &scl);
 

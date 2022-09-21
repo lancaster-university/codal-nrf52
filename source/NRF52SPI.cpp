@@ -152,7 +152,6 @@ void NRF52SPI::config()
 
     setPinLock(true);
 
-    DMESG("NRF52SPI: Updating CONFIG...");
     nrf_spim_disable(p_spim);
 
     setDrive(sck);
@@ -165,20 +164,17 @@ void NRF52SPI::config()
         mosi->setDigitalValue(0);
         mosi->setPull(mode <= 1 ? PullMode::Down : PullMode::Up);
         mosi_pin = mosi->name;
-        DMESG("NRF52SPI: Updating CONFIG... MOSI set: %p", mosi_pin);
     }
     if (miso)
     {
         miso->getDigitalValue();
         miso->setPull(mode <= 1 ? PullMode::Down : PullMode::Up);
         miso_pin = miso->name;
-        DMESG("NRF52SPI: Updating CONFIG... MISO set: %p", miso_pin);
     }
     if (sck)
     {
         sck->setDigitalValue(mode <= 1 ? 0 : 1);
         sck_pin = sck->name;
-        DMESG("NRF52SPI: Updating CONFIG... SCK set: %p", sck_pin);
     }
 
     nrf_spim_pins_set(p_spim, sck_pin, mosi_pin, miso_pin);
@@ -193,8 +189,6 @@ void NRF52SPI::config()
     NVIC_EnableIRQ(IRQn);
 
     setPinLock(true);
-
-    DMESG("SPI config done f=%d", freq);
 }
 
 /** Set the frequency of the SPI interface
