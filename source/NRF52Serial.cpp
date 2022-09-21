@@ -1,6 +1,7 @@
 #include "NRF52Serial.h"
 #include "peripheral_alloc.h"
 #include "NotifyEvents.h"
+#include "CodalDmesg.h"
 
 using namespace codal;
 
@@ -300,40 +301,34 @@ void NRF52Serial::updateRxBufferAfterRXSTARTED()
 
 /**
  * Puts the component in (or out of) sleep (low power) mode.
+ * 
+ * If CODAL_SERIAL_STATUS_DEEPSLEEP is set, then the peripheral will remain active during deep
+ * sleep, and will wake the processor if new data is received.
  */
 int NRF52Serial::setSleep(bool doSleep)
 {
-    IRQn_Type IRQn = get_alloc_peri_irqn(p_uarte_);
+    IRQn_Type IRQn = get_alloc_peri_irqn( p_uarte_ );
 
-    if (doSleep)
-    {
-        if ( !(status & CODAL_SERIAL_STATUS_DEEPSLEEP))
-        {
-            disableInterrupt(RxInterrupt);
+    if ( doSleep && !(status & CODAL_SERIAL_STATUS_DEEPSLEEP) ) {
+        // Disable the RX interrupt and IRQ. Clear the buffers
+        disableInterrupt( RxInterrupt );
 
-            while (txBufferedSize() > 0 || is_tx_in_progress_) /*wait*/;
+        // wait...
+        while ( txBufferedSize() > 0 || is_tx_in_progress_ );
 
-            NVIC_DisableIRQ(IRQn);
+        NVIC_DisableIRQ( IRQn );
+    
+    } else {
+        // Reconnect IRQs and re-set settings
+        NVIC_ClearPendingIRQ( IRQn );
+        NVIC_EnableIRQ( IRQn );
 
-            status |= CODAL_SERIAL_STATUS_DEEPSLEEP;
-        }
-    }
-    else
-    {
-        if ( status & CODAL_SERIAL_STATUS_DEEPSLEEP)
-        {
-            NVIC_ClearPendingIRQ(IRQn);
-            NVIC_EnableIRQ(IRQn);            
+        enableInterrupt( RxInterrupt );
 
-            enableInterrupt(RxInterrupt);
+        if( txBufferedSize() > 0 )
+            enableInterrupt( TxInterrupt );
 
-            if(txBufferedSize() > 0)
-                enableInterrupt(TxInterrupt);
-
-            this->setBaud(this->baudrate);
-
-            status &= ~CODAL_SERIAL_STATUS_DEEPSLEEP;
-        }
+        this->setBaud( this->baudrate );
     }
    
     return DEVICE_OK;
