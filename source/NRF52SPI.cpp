@@ -135,14 +135,6 @@ int NRF52SPI::startTransfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *r
         return codal::SPI::startTransfer(txBuffer, txSize, rxBuffer, rxSize, doneHandler, arg);
 }
 
-static void setDrive(Pin *p)
-{
-    if (!p)
-        return;
-    NRF52Pin *pp = (NRF52Pin *)p;
-    pp->setHighDrive(true);
-}
-
 void NRF52SPI::config()
 {
     if (configured)
@@ -154,8 +146,6 @@ void NRF52SPI::config()
 
     nrf_spim_disable(p_spim);
 
-    setDrive(sck);
-    setDrive(mosi);
     uint32_t mosi_pin = 0xffffffff;
     uint32_t miso_pin = 0xffffffff;
     uint32_t sck_pin = 0xffffffff;
