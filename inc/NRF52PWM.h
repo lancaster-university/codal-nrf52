@@ -15,9 +15,15 @@
 #define NRF52PWM_PWM_PERIPHERALS    3
 #define NRF52PWM_PWM_CHANNELS       4
 
-
+// This "using namespace codal" cannot be removed from this header file without
+// breaking targets where some .cpp files depend on it. So this config flag is
+// enabled by default and keeps the namespace for compatibility.
+#if CONFIG_ENABLED(CODAL_USE_GLOBAL_NAMESPACE)
 using namespace codal;
+#endif
 
+namespace codal
+{
 class NRF52PWM : public CodalComponent, public DataSink, public PinPeripheral
 {
 
@@ -153,5 +159,6 @@ public:
     int tryPull(uint8_t b);
 
 };
+} // namespace codal
 
 #endif
