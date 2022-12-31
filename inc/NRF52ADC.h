@@ -42,15 +42,14 @@ DEALINGS IN THE SOFTWARE.
 //
 #define NRF52_ADC_DATA_READY     1
 
-
-using namespace codal;
-
 //
 // NRF52ADCChannel status codes
 //
 #define NRF52_ADC_CHANNEL_STATUS_ENABLED                0x10
 #define NRF52_ADC_CHANNEL_STATUS_CONNECTED              0x20
 
+namespace codal
+{
 class NRF52ADC;
 
 class NRF52ADCChannel : public DataSource
@@ -342,5 +341,6 @@ private:
      */
     void configureSampling();
 };
+} // namespace codal
 
 #endif

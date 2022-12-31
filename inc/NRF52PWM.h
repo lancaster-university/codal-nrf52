@@ -15,9 +15,13 @@
 #define NRF52PWM_PWM_PERIPHERALS    3
 #define NRF52PWM_PWM_CHANNELS       4
 
-
+// TODO: Currently other CODAL libraries depend on this global namespace to
+// compile, once those are fixed `using namespace codal;` line can be removed
+// https://github.com/lancaster-university/codal-nrf52/pull/43
 using namespace codal;
 
+namespace codal
+{
 class NRF52PWM : public CodalComponent, public DataSink, public PinPeripheral
 {
 
@@ -153,5 +157,6 @@ public:
     int tryPull(uint8_t b);
 
 };
+} // namespace codal
 
 #endif
