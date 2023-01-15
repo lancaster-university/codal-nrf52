@@ -111,6 +111,10 @@ public:
      */
     virtual int setFormat(int format);
 
+    virtual float getSampleRate();
+    
+    virtual float requestSampleRate(float sampleRate);
+
     /**
      *  Determine the buffer size this channel will use for data streaming.
      *  @return the current size of the buffers used by this channel, in bytes.

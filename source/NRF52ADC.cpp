@@ -97,6 +97,19 @@ int NRF52ADCChannel::setFormat(int format)
     return DEVICE_NOT_SUPPORTED;
 }
 
+float NRF52ADCChannel::getSampleRate() {
+    return 1000000 / this->adc.getSamplePeriod(); // Note: getSamplePeriod returns in uS.
+}
+
+float NRF52ADCChannel::requestSampleRate( float sampleRate )
+{
+    int newPeriod = 1000000 / sampleRate;
+    if( this->adc.getSamplePeriod() > newPeriod ) // Note: getSamplePeriod returns in uS.
+        this->adc.setSamplePeriod( newPeriod );
+    
+    return this->getSampleRate();
+}
+
 /**
  *  Determine the buffer size this channel will use for data streaming.
  *  @return the current size of the buffers used by this channel, in bytes.
