@@ -189,11 +189,17 @@ void NRF52Pin::connect(PinPeripheral &p, bool deleteOnRelease)
   */
 void NRF52Pin::disconnect()
 {
+    // Avoid any potential recursive loops caused by pin swaps within a single peripheral
+    if (isDisconnecting())
+        return;
+
     // Detach any on chip peripherals attached to this pin.
-    if (obj)
+    if (obj && !obj->isPinLocked())
     {
-        if (!obj->isPinLocked())
-            obj->releasePin(*this);
+        // Indicate that this pin is in the process of being disconnected.
+        status |= IO_STATUS_DISCONNECTING;
+
+        obj->releasePin(*this);
 
         // If we have previously allocated a PWM channel to this pin through setAnalogValue(), mark that PWM channel as free for future allocation.
         if (obj == pwm)
@@ -202,13 +208,14 @@ void NRF52Pin::disconnect()
                 if (pwmChannelMap[i] == name)
                     pwmChannelMap[i] = -1;
         }
+
+        obj = NULL;
     }
 
     // Disable any interrupts that may be attached to the pin GPIO state.
     PORT->PIN_CNF[PIN] &= ~(GPIO_PIN_CNF_SENSE_Msk);
 
     // Reset status flags to zero, but retain preferred TouchSense, Polarity and wake modes.
-    obj = NULL;
     status &= IO_STATUS_MODES;
 }
 
