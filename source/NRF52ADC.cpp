@@ -170,6 +170,11 @@ void NRF52ADCChannel::connect(DataSink& component)
     this->status |= NRF52_ADC_CHANNEL_STATUS_CONNECTED;
 }
 
+bool NRF52ADCChannel::isConnected()
+{
+    return this->status & NRF52_ADC_CHANNEL_STATUS_CONNECTED;
+}
+
 /**
  * Provide the next available ManagedBuffer to our downstream caller, if available.
  */
