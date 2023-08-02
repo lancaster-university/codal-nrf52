@@ -84,6 +84,23 @@ NRF52TouchSensor::addTouchButton(TouchButton *button)
     return DEVICE_OK;
 }
 
+/**
+ * Stop touch sensing on the given button.
+ */
+int
+NRF52TouchSensor::removeTouchButton(TouchButton *button)
+{
+    TouchSensor::removeTouchButton(button);
+    button->setPinValue(0);
+
+    // If we've just removed he last button, ensure the GPIOTE state is cleared.
+    if (numberOfButtons == 0)
+        NRF_GPIOTE->CONFIG[NRF52_TOUCH_SENSOR_GPIOTE_CHANNEL] = 0;
+
+    return DEVICE_OK;
+}
+
+
 extern void calibrateTest(float sample);
 
 /**

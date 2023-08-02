@@ -65,7 +65,12 @@ namespace codal
         /**
           * Begin touch sensing on the given button
           */
-        virtual int addTouchButton(TouchButton *button);
+        virtual int addTouchButton(TouchButton *button) override;
+
+        /**
+        * Stop touch sensing on the given button.
+        */
+        virtual int removeTouchButton(TouchButton *button) override;
 
         /**
          * Initiate a scan of the sensors.

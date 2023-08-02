@@ -73,9 +73,6 @@ namespace codal
         static int8_t pwmChannelMap[NRF52PIN_PWM_CHANNEL_MAP_SIZE];
         static uint8_t lastUsedChannel;
 
-        PinPeripheral* obj;
-
-
         /**
              * Instantiates the components required for PWM if not previously created
              */

@@ -156,7 +156,6 @@ NRF52Pin::NRF52Pin(int id, PinNumber name, PinCapability capability) : codal::Pi
     this->pullMode = DEVICE_DEFAULT_PULLMODE;
     CODAL_ASSERT(name < NUM_PINS, 50);
     irq_pins[name] = this;
-    this->obj = NULL;
 
     NRF_GPIOTE->INTENSET    = GPIOTE_INTENSET_PORT_Set << GPIOTE_INTENSET_PORT_Pos;
     NVIC_EnableIRQ  (GPIOTE_IRQn);
