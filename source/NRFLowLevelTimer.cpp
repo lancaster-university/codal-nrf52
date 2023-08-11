@@ -115,6 +115,7 @@ int NRFLowLevelTimer::disable()
 {
     disableIRQ();
     timer->TASKS_STOP = 1;
+    timer->TASKS_SHUTDOWN = 1;
     return DEVICE_OK;
 }
 
