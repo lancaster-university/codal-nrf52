@@ -33,7 +33,12 @@ list(APPEND INCLUDE_DIRS
 
 list(APPEND SOURCE_FILES "asm/CortexContextSwitch.s")
 list(APPEND SOURCE_FILES "nrfx/mdk/system_${DEV}.c")
-list(APPEND SOURCE_FILES "nrfx/mdk/gcc_startup_${DEV}.S")
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/nrfx_mods/mdk/gcc_startup_${DEV}.S")
+    list(APPEND SOURCE_FILES "nrfx_mods/mdk/gcc_startup_${DEV}.S")
+else()
+    list(APPEND SOURCE_FILES "nrfx/mdk/gcc_startup_${DEV}.S")
+endif()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNRFX_PRS_ENABLED=0")
 

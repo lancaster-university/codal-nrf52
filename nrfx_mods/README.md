@@ -1,0 +1,1 @@
+This directory enables overwriting nrfx source files so we can instead use our own. nrfx is a submodule of this repository, but this location should be checked first, if any issues arise from this area to ensure default functionality hasn't been changed.
