@@ -72,7 +72,7 @@ public:
      *
      * @param frequency The bus frequency in hertz
      */
-    virtual int setFrequency(uint32_t frequency);
+    virtual int setFrequency(uint32_t frequency) override;
 
     int frequency(uint32_t frequency) { return setFrequency(frequency); }
 
@@ -90,7 +90,7 @@ public:
      *   3  |  1   1
      * @endcode
      */
-    virtual int setMode(int mode, int bits = 8);
+    virtual int setMode(int mode, int bits = 8) override;
 
     int format(int bits, int mode) { return setMode(mode, bits); }
 
@@ -102,7 +102,7 @@ public:
      * @param data The data to write.
      * @return Response from the SPI slave or DEVICE_SPI_ERROR if the the write request failed.
      */
-    virtual int write(int data);
+    virtual int write(int data) override;
 
     /**
      * Writes and reads from the SPI bus concurrently. Waits (possibly un-scheduled) for transfer to finish.
@@ -110,7 +110,7 @@ public:
      * Either buffer can be NULL.
      */
     virtual int transfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
-                         uint32_t rxSize);
+                         uint32_t rxSize) override;
 
     /**
      * Writes and reads from the SPI bus concurrently. Finally, calls doneHandler (possibly in IRQ context).
@@ -118,7 +118,7 @@ public:
      * Either buffer can be NULL.
      */
     virtual int startTransfer(const uint8_t *txBuffer, uint32_t txSize, uint8_t *rxBuffer,
-                         uint32_t rxSize, PVoidCallback doneHandler, void *arg);
+                         uint32_t rxSize, PVoidCallback doneHandler, void *arg) override;
 
     /**
       * Change the pins used by this I2C peripheral to those provided.

@@ -58,7 +58,7 @@ public:
      *
      * @param frequency The bus frequency in hertz
      */
-    virtual int setFrequency(uint32_t frequency);
+    virtual int setFrequency(uint32_t frequency) override;
 
     /**
       * Change the pins used by this I2C peripheral to those provided.
@@ -95,7 +95,7 @@ public:
     *
     * @return DEVICE_OK on success, DEVICE_I2C_ERROR if the the write request failed.
     */
-    virtual int write(uint16_t address, uint8_t *data, int len, bool repeated = false);
+    virtual int write(uint16_t address, uint8_t *data, int len, bool repeated = false) override;
 
     /**
       * Issues a standard, 2 byte I2C command read to the I2C bus.
@@ -114,7 +114,7 @@ public:
       *
       * @return DEVICE_OK on success, DEVICE_I2C_ERROR if the the read request failed.
       */
-    virtual int read(uint16_t address, uint8_t *data, int len, bool repeated = false);
+    virtual int read(uint16_t address, uint8_t *data, int len, bool repeated = false) override;
 
     /**
       * Performs a typical register read operation to the I2C slave device provided.
@@ -138,7 +138,7 @@ public:
       *
       * @return DEVICE_OK or DEVICE_I2C_ERROR if the the read request failed.
       */
-    virtual int readRegister(uint16_t address, uint8_t reg, uint8_t *data, int length, bool repeated = true);
+    virtual int readRegister(uint16_t address, uint8_t reg, uint8_t *data, int length, bool repeated = true) override;
 
     /**
       * Clear I2C bus

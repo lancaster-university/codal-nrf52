@@ -98,7 +98,7 @@ public:
      *
      * @param component The new downstream component for this ADC.
      */
-	virtual void connect(DataSink &component);
+    virtual void connect(DataSink &component) override;
 
     /**
      * Determines if this source is connected to a downstream component
@@ -106,22 +106,22 @@ public:
      * @return true If a downstream is connected
      * @return false If a downstream is not connected
      */
-    bool isConnected();
+    virtual bool isConnected() override;
 
     /**
      *  Determine the data format of the buffers streamed out of this component.
      */
-    virtual int getFormat();
+    virtual int getFormat() override;
 
     /**
      * Defines the data format of the buffers streamed out of this component.
      * @param format valid values include DATASTREAM_FORMAT_16BIT_SIGNED
      */
-    virtual int setFormat(int format);
+    virtual int setFormat(int format) override;
 
-    virtual float getSampleRate();
+    virtual float getSampleRate() override;
     
-    virtual float requestSampleRate(float sampleRate);
+    virtual float requestSampleRate(float sampleRate) override;
 
     /**
      *  Determine the buffer size this channel will use for data streaming.
@@ -136,9 +136,9 @@ public:
     int setBufferSize(int bufferSize);
 
     /**
-	 * Provide the next available ManagedBuffer to our downstream caller, if available.
-	 */
-	virtual ManagedBuffer pull();
+     * Provide the next available ManagedBuffer to our downstream caller, if available.
+     */
+    virtual ManagedBuffer pull() override;
 
     /**
      * Determine the value of the next sample read from this channel.

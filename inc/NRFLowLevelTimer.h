@@ -18,29 +18,29 @@ namespace codal
 
         virtual int setIRQPriority(int priority) override;
 
-        virtual int enable();
+        virtual int enable() override;
 
-        virtual int enableIRQ();
+        virtual int enableIRQ() override;
 
-        virtual int disable();
+        virtual int disable() override;
 
-        virtual int disableIRQ();
+        virtual int disableIRQ() override;
 
-        virtual int reset();
+        virtual int reset() override;
 
-        virtual int setMode(TimerMode t);
+        virtual int setMode(TimerMode t) override;
 
-        virtual int setCompare(uint8_t channel, uint32_t value);
+        virtual int setCompare(uint8_t channel, uint32_t value) override;
 
-        virtual int offsetCompare(uint8_t channel, uint32_t value);
+        virtual int offsetCompare(uint8_t channel, uint32_t value) override;
 
-        virtual int clearCompare(uint8_t channel);
+        virtual int clearCompare(uint8_t channel) override;
 
-        virtual uint32_t captureCounter();
+        virtual uint32_t captureCounter() override;
 
-        virtual int setClockSpeed(uint32_t speedKHz);
+        virtual int setClockSpeed(uint32_t speedKHz) override;
 
-        virtual int setBitMode(TimerBitMode t);
+        virtual int setBitMode(TimerBitMode t) override;
 
         virtual int setSleep(bool doSleep) override;
     };

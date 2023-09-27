@@ -69,17 +69,17 @@ namespace codal
         /**
          * Provide the next available ManagedBuffer to our downstream caller, if available.
          */
-        virtual ManagedBuffer pull();
+        virtual ManagedBuffer pull() override;
 
         /**
          *  Determine the data format of the buffers streamed out of this component.
          */
-        virtual int getFormat();
+        virtual int getFormat() override;
 
         /*
          * Allow out downstream component to register itself with us
          */
-        virtual void connect(DataSink &sink);
+        virtual void connect(DataSink &sink) override;
 
         /**
          *  Determine the maximum size of the buffers streamed out of this component.

@@ -56,13 +56,13 @@ public:
     /**
      * Callback provided when data is ready.
      */
-    virtual int pullRequest();
+    virtual int pullRequest() override;
 
     /**
      * Determine the DAC playback sample rate to the given frequency.
      * @return the current sample rate.
      */
-    float getSampleRate();
+    virtual float getSampleRate();
 
     /**
      * Determine the maximum unsigned vlaue that can be loaded into the PWM data values, for the current

@@ -182,14 +182,14 @@ class NRF52Radio : public Radio
       *
       * @return DEVICE_OK on success, DEVICE_NOT_SUPPORTED if the BLE stack is running.
       */
-    virtual int enable();
+    virtual int enable() override;
 
     /**
       * Disables the radio for use as a multipoint sender/receiver.
       *
       * @return DEVICE_OK on success, DEVICE_NOT_SUPPORTED if the BLE stack is running.
       */
-    virtual int disable();
+    virtual int disable() override;
 
     /**
       * Sets the radio to listen to packets sent with the given group id.
@@ -204,7 +204,7 @@ class NRF52Radio : public Radio
       * A background, low priority callback that is triggered whenever the processor is idle.
       * Here, we empty our queue of received packets, and pass them onto higher level protocol handlers.
       */
-    virtual void idleCallback();
+    virtual void idleCallback() override;
 
     /**
       * Determines the number of packets ready to be processed.
@@ -245,7 +245,7 @@ class NRF52Radio : public Radio
       * @note Once recv() has been called, it is the callers responsibility to
       *       delete the buffer when appropriate.
       */
-    virtual ManagedBuffer recvBuffer();
+    virtual ManagedBuffer recvBuffer() override;
 
     /**
       * Transmits the given buffer onto the broadcast radio.
@@ -255,7 +255,7 @@ class NRF52Radio : public Radio
       *
       * @return DEVICE_OK on success, or DEVICE_NOT_SUPPORTED if the BLE stack is running.
       */
-    virtual int sendBuffer(ManagedBuffer b);
+    virtual int sendBuffer(ManagedBuffer b) override;
 };
 }
 

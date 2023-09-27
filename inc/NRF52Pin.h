@@ -446,7 +446,7 @@ namespace codal
          * Otherwise, do nothing and return DEVICE_BUSY.
          * Note, that this is overwritten in hardware-specific classes to check the condition immedietly before changing the pin value.
          */
-        virtual int getAndSetDigitalValue(int value);
+        virtual int getAndSetDigitalValue(int value) override;
 
         /**
          * Configures the Enables/Disables this pin's DETECT event

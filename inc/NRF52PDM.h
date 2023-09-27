@@ -66,15 +66,15 @@ public:
       */
     NRF52PDM(Pin &sd, Pin &sck, uint16_t id = DEVICE_ID_SYSTEM_MICROPHONE);
 
-	/**
-	 * Provide the next available ManagedBuffer to our downstream caller, if available.
-	 */
-	virtual ManagedBuffer pull();
+    /**
+     * Provide the next available ManagedBuffer to our downstream caller, if available.
+     */
+    virtual ManagedBuffer pull() override;
 
-	/**
+    /**
      * Update our reference to a downstream component.
-	 */
-	virtual void connect(DataSink &sink);
+     */
+    virtual void connect(DataSink &sink) override;
 
     /**
      * Interrupt callback when playback of DMA buffer has completed
