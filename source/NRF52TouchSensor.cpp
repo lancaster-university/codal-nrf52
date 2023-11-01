@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include "NRF52TouchSensor.h"
-#include "CodalDmesg.h"
 
 using namespace codal;
 

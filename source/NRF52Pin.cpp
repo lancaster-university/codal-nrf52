@@ -34,7 +34,6 @@ DEALINGS IN THE SOFTWARE.
 #include "ErrorNo.h"
 #include "nrf.h"
 #include "EventModel.h"
-#include "CodalDmesg.h"
 #include "codal_target_hal.h"
 #include "NotifyEvents.h"
 
@@ -587,6 +586,22 @@ int NRF52Pin::isTouched(TouchMode touchMode)
         return ((TouchButton *)obj)->isPressed();
     else
         return ((Button *)obj)->isPressed();
+}
+
+int NRF52Pin::wasTouched()
+{
+    if( (status & IO_STATUS_TOUCH_IN) == 0 ) {
+        if( this->isTouched( TouchMode::Capacitative ) == DEVICE_NOT_SUPPORTED )
+            return DEVICE_NOT_SUPPORTED;
+    }
+    
+    if( status & IO_STATUS_CAPACITATIVE_TOUCH == IO_STATUS_CAPACITATIVE_TOUCH )
+    {
+        //((TouchButton*)obj)->buttonActive(); // Force ourselves up
+        return ((TouchButton *)obj)->wasPressed();
+    }
+
+    return ((Button *)obj)->wasPressed();
 }
 
 /**

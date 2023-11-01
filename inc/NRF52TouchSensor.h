@@ -43,7 +43,7 @@ namespace codal
     /**
       * Class definition for an NRF52TouchSensor
       *
-      * Drives a number of single ended TouchButtons, based on a hardware supported implementation unsing a hardware timer and PPI.
+      * Drives a number of single ended TouchButtons, based on a hardware supported implementation using a hardware timer and PPI.
       */
     class NRF52TouchSensor : public TouchSensor
     {

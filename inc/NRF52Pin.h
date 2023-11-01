@@ -300,6 +300,17 @@ namespace codal
         int isTouched(TouchMode touchMode);
 
         /**
+         * Configures this pin as a "makey makey" style touch sensor (if required) and tests if at any point the pin has
+         * been touched since the last time this was called.
+         * 
+         * Note that holding the pin in the 'touched' state will only generate one event, so this can be viewed as a kind
+         * of 'falling edge' detection, where only a not-touched followed by a touched event must occur to increment the count.
+         * 
+         * @return int The number of touch events since the last call.
+         */
+        int wasTouched();
+
+        /**
          * If this pin is configured as a capacitative touch input, perform a calibration on the input.
          */
         void touchCalibrate();
