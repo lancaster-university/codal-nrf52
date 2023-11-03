@@ -40,7 +40,8 @@ DEALINGS IN THE SOFTWARE.
 //
 #define NRF52_PDM_BUFFER_SIZE           512
 
-using namespace codal;
+namespace codal
+{
 
 class NRF52PDM : public CodalComponent, public DataSource
 {
@@ -103,5 +104,6 @@ private:
 
     void startDMA();
 };
+} // namespace codal
 
 #endif

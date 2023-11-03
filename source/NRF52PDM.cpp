@@ -26,6 +26,8 @@ DEALINGS IN THE SOFTWARE.
 #include "NRF52PDM.h"
 #include "nrf.h"
 
+using namespace codal;
+
 // Handle on the last (and probably only) instance of this class (NRF52 has only one PDM module)
 static NRF52PDM *nrf52_pdm_driver = NULL;
 
