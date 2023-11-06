@@ -35,6 +35,7 @@ static void touch_sense_irq(uint16_t mask)
     if (instance)
         instance->onSampleEvent();
 }
+
 /**
  * Constructor.
  *

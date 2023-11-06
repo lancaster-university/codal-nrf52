@@ -584,23 +584,21 @@ int NRF52Pin::isTouched(TouchMode touchMode)
 
     if (touchMode == TouchMode::Capacitative)
         return ((TouchButton *)obj)->isPressed();
-    else
-        return ((Button *)obj)->isPressed();
+    
+    return ((Button *)obj)->isPressed();
 }
 
-int NRF52Pin::wasTouched()
+int NRF52Pin::wasTouched(TouchMode touchMode)
 {
-    if( (status & IO_STATUS_TOUCH_IN) == 0 ) {
-        if( this->isTouched( TouchMode::Capacitative ) == DEVICE_NOT_SUPPORTED )
-            return DEVICE_NOT_SUPPORTED;
-    }
+    TouchMode currentTouchMode = (status & IO_STATUS_CAPACITATIVE_TOUCH) ? TouchMode::Capacitative : TouchMode::Resistive;
     
-    if( status & IO_STATUS_CAPACITATIVE_TOUCH == IO_STATUS_CAPACITATIVE_TOUCH )
-    {
-        //((TouchButton*)obj)->buttonActive(); // Force ourselves up
+    if ((status & IO_STATUS_TOUCH_IN) == 0 || touchMode != currentTouchMode)
+        if( this->isTouched( touchMode ) == DEVICE_NOT_SUPPORTED )
+            return DEVICE_NOT_SUPPORTED;
+    
+    if (touchMode == TouchMode::Capacitative)
         return ((TouchButton *)obj)->wasPressed();
-    }
-
+    
     return ((Button *)obj)->wasPressed();
 }
 
