@@ -302,17 +302,31 @@ namespace codal
         /**
          * Configures this pin as a "makey makey" style touch sensor (if required) and tests if at any point the pin has
          * been touched _since the last time_ this was called.
-         * 
+         *
          * Note that holding the pin in the 'touched' state will only generate one event, so this can be viewed as a kind
          * of 'falling edge' detection, where only a not-touched followed by a touched event must occur to increment the count.
-         * 
-         * For this to work, the there must be two sequential `wasTouched` calls with the same parameter used with no other pin
+         *
+         * For this to work, the there must be two sequential `wasTouched` calls with no other pin
          * mode changes in between for this pin, otherwise the touch count will be reset.
-         * 
-         * @param touchMode Which touch mode to use this pin in. Defaults to TouchMode::Capacitive
+         *
          * @return int The number of touch events since the last call.
          */
-        int wasTouched( TouchMode touchMode = TouchMode::Capacitative );
+        int wasTouched();
+
+        /**
+         * Configures this pin as a "makey makey" style touch sensor (if required) and tests if at any point the pin has
+         * been touched _since the last time_ this was called.
+         *
+         * Note that holding the pin in the 'touched' state will only generate one event, so this can be viewed as a kind
+         * of 'falling edge' detection, where only a not-touched followed by a touched event must occur to increment the count.
+         *
+         * For this to work, the there must be two sequential `wasTouched` calls with the same parameter used with no other pin
+         * mode changes in between for this pin, otherwise the touch count will be reset.
+         *
+         * @param touchMode Which touch mode to use this pin in.
+         * @return int The number of touch events since the last call.
+         */
+        int wasTouched(TouchMode touchMode);
 
         /**
          * If this pin is configured as a capacitative touch input, perform a calibration on the input.
