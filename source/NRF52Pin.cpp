@@ -588,6 +588,12 @@ int NRF52Pin::isTouched(TouchMode touchMode)
     return ((Button *)obj)->isPressed();
 }
 
+int NRF52Pin::wasTouched()
+{
+    // Maintain the last type of sensing used.
+    return wasTouched(status & IO_STATUS_CAPACITATIVE_TOUCH ? TouchMode::Capacitative : TouchMode::Resistive);
+}
+
 int NRF52Pin::wasTouched(TouchMode touchMode)
 {
     TouchMode currentTouchMode = (status & IO_STATUS_CAPACITATIVE_TOUCH) ? TouchMode::Capacitative : TouchMode::Resistive;
