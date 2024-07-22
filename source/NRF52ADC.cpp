@@ -29,6 +29,8 @@ DEALINGS IN THE SOFTWARE.
 #include "nrf.h"
 #include "cmsis.h"
 
+using namespace codal;
+
 // Calculation to determine the optimal usable space for a DMA buffer for the given number of channels
 #define NRF52ADC_DMA_ALIGNED_SIZED(c)   ((bufferSize - (bufferSize % (c * 2 * softwareOversample)))/2);
 

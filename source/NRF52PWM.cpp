@@ -2,6 +2,8 @@
 #include "nrf.h"
 #include "cmsis.h"
 
+using namespace codal;
+
 #define  NRF52PWM_EMPTY_BUFFERSIZE  8
 static uint16_t emptyBuffer[NRF52PWM_EMPTY_BUFFERSIZE];
 
