@@ -8,7 +8,7 @@ using namespace codal;
 
 #if CONFIG_ENABLED(HARDWARE_NEOPIXEL)
 
-void neopixel_send_buffer(Pin &pin, const uint8_t *ptr, int numBytes)
+void codal::neopixel_send_buffer(Pin &pin, const uint8_t *ptr, int numBytes)
 {
     static NRF52PWM *pwm = NULL;
     static WS2812B *ws = NULL;
@@ -29,7 +29,7 @@ void neopixel_send_buffer(Pin &pin, const uint8_t *ptr, int numBytes)
 
 #else
 
-__attribute__((noinline)) void neopixel_send_buffer(Pin &pin, const uint8_t *ptr, int numBytes)
+__attribute__((noinline)) void codal::neopixel_send_buffer(Pin &pin, const uint8_t *ptr, int numBytes)
 {
     pin.setDigitalValue(0);
 
@@ -88,7 +88,7 @@ __attribute__((noinline)) void neopixel_send_buffer(Pin &pin, const uint8_t *ptr
 }
 #endif
 
-void neopixel_send_buffer(Pin &pin, ManagedBuffer buffer)
+void codal::neopixel_send_buffer(Pin &pin, ManagedBuffer buffer)
 {
     codal::neopixel_send_buffer(pin, &buffer[0], buffer.length());
 }
