@@ -40,7 +40,15 @@ DEALINGS IN THE SOFTWARE.
 //
 #define NRF52_PDM_BUFFER_SIZE           512
 
+// This "using namespace codal" cannot be removed from this header file without
+// breaking targets where some .cpp files depend on it. So this config flag is
+// enabled by default and keeps the namespace for compatibility.
+#if CONFIG_ENABLED(CODAL_USE_GLOBAL_NAMESPACE)
 using namespace codal;
+#endif
+
+namespace codal
+{
 
 class NRF52PDM : public CodalComponent, public DataSource
 {
@@ -103,5 +111,6 @@ private:
 
     void startDMA();
 };
+} // namespace codal
 
 #endif

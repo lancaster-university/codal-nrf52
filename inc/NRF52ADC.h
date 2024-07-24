@@ -42,8 +42,12 @@ DEALINGS IN THE SOFTWARE.
 //
 #define NRF52_ADC_DATA_READY     1
 
-
+// This "using namespace codal" cannot be removed from this header file without
+// breaking targets where some .cpp files depend on it. So this config flag is
+// enabled by default and keeps the namespace for compatibility.
+#if CONFIG_ENABLED(CODAL_USE_GLOBAL_NAMESPACE)
 using namespace codal;
+#endif
 
 //
 // NRF52ADCChannel status codes
@@ -51,6 +55,8 @@ using namespace codal;
 #define NRF52_ADC_CHANNEL_STATUS_ENABLED                0x10
 #define NRF52_ADC_CHANNEL_STATUS_CONNECTED              0x20
 
+namespace codal
+{
 class NRF52ADC;
 
 class NRF52ADCChannel : public DataSource
@@ -350,5 +356,6 @@ private:
      */
     void configureSampling();
 };
+} // namespace codal
 
 #endif
