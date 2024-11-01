@@ -100,7 +100,8 @@ int NRF52ADCChannel::setFormat(int format)
 }
 
 float NRF52ADCChannel::getSampleRate() {
-    return 1000000 / this->adc.getSamplePeriod(); // Note: getSamplePeriod returns in uS.
+    int v = 1000000 / this->adc.getSamplePeriod(); // Note: getSamplePeriod returns in uS. 
+    return v;
 }
 
 float NRF52ADCChannel::requestSampleRate( float sampleRate )
