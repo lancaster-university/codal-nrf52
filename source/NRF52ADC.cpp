@@ -80,6 +80,22 @@ NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), out
 }
 
 /**
+ * Indicates a downstream channel may want to start/stop the flow of data
+ */
+void NRF52ADCChannel::dataWanted(bool wanted)
+{
+    DMESG("dataWanted indication: DataWanted = %d", wanted);
+
+    bool enabled = (status & NRF52_ADC_CHANNEL_STATUS_ENABLED);
+
+    if (wanted && !enabled)
+        enable();
+
+    if (!wanted && enabled)
+        disable();
+}
+
+/**
  *  Determine the data format of the buffers streamed out of this component.
  */
 int NRF52ADCChannel::getFormat()

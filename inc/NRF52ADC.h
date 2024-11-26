@@ -98,6 +98,10 @@ public:
      */
     int isEnabled();
 
+    /**
+     * Indicates a downstream channel may want to start/stop the flow of data
+     */
+    virtual void dataWanted(bool wanted);
 
     /**
      * Update our reference to a downstream component.
