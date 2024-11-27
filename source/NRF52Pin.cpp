@@ -227,6 +227,7 @@ void NRF52Pin::disconnect()
   *
   * @code
   * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
+  * 
   * P0.setDigitalValue(1); // P0 is now HI
   * @endcode
   */
@@ -266,6 +267,7 @@ int NRF52Pin::setDigitalValue(int value)
   *
   * @code
   * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
+  * 
   * P0.getDigitalValue(); // P0 is either 0 or 1;
   * @endcode
   */
@@ -293,16 +295,16 @@ int NRF52Pin::getDigitalValue()
 }
 
 /**
- * Configures this IO pin as a digital input with the specified internal pull-up/pull-down configuraiton (if necessary) and tests its current value.
+ * Configures this IO pin as a digital input (if necessary) and tests its current value.
  *
- * @param pull one of the pull configurations: PullMode::Up, PullMode::Down, or PullMode::None.
  *
  * @return 1 if this input is high, 0 if input is LO, or DEVICE_NOT_SUPPORTED
  *         if the given pin does not have digital capability.
  *
  * @code
- * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
- * P0.getDigitalValue(PullMode::Up); 
+ * DevicePin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
+ * 
+ * P0.getDigitalValue(); // P0 is either 0 or 1;
  * @endcode
  */
 int NRF52Pin::getDigitalValue(PullMode pull)
@@ -381,22 +383,22 @@ int NRF52Pin::setAnalogValue(int value)
 }
 
 /**
-  * Configures this IO pin as an analog/pwm output (if necessary) and configures the period to be 20ms,
-  * with a duty cycle between 500 us and 2500 us.
-  *
-  * A value of 180 sets the duty cycle to be 2500us, and a value of 0 sets the duty cycle to be 500us by default.
-  *
-  * This range can be modified to fine tune, and also tolerate different servos.
-  *
-  * @param value the level to set on the output pin, in the range 0 - 180.
-  *
-  * @param range which gives the span of possible values the i.e. the lower and upper bounds (center +/- range/2). Defaults to DEVICE_PIN_DEFAULT_SERVO_RANGE.
-  *
-  * @param center the center point from which to calculate the lower and upper bounds. Defaults to DEVICE_PIN_DEFAULT_SERVO_CENTER
-  *
-  * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if value is out of range, or DEVICE_NOT_SUPPORTED
-  *         if the given pin does not have analog capability.
-  */
+ * Configures this IO pin as an analog/pwm output (if necessary) and configures the period to be 20ms,
+ * with a duty cycle between 500 us and 2500 us.
+ *
+ * A value of 180 sets the duty cycle to be 2500us, and a value of 0 sets the duty cycle to be 500us by default.
+ *
+ * This range can be modified to fine tune, and also tolerate different servos.
+ *
+ * @param value the level to set on the output pin, in the range 0 - 180.
+ *
+ * @param range which gives the span of possible values the i.e. the lower and upper bounds (center +/- range/2). Defaults to DEVICE_PIN_DEFAULT_SERVO_RANGE.
+ *
+ * @param center the center point from which to calculate the lower and upper bounds. Defaults to DEVICE_PIN_DEFAULT_SERVO_CENTER
+ *
+ * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if value is out of range, or DEVICE_NOT_SUPPORTED
+ *         if the given pin does not have analog capability.
+ */
 int NRF52Pin::setServoValue(int value, int range, int center)
 {
     //check if this pin has an analogue mode...
@@ -423,16 +425,17 @@ int NRF52Pin::setServoValue(int value, int range, int center)
 }
 
 /**
-  * Configures this IO pin as an analogue input (if necessary), and samples the Pin for its analog value.
-  *
-  * @return the current analogue level on the pin, in the range 0 - 1024, or
-  *         DEVICE_NOT_SUPPORTED if the given pin does not have analog capability.
-  *
-  * @code
-  * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
-  * P0.getAnalogValue(); // P0 is a value in the range of 0 - 1024
-  * @endcode
-  */
+ * Configures this IO pin as an analogue input (if necessary), and samples the Pin for its analog value.
+ *
+ * @return the current analogue level on the pin, in the range 0 - 1024, or
+ *         DEVICE_NOT_SUPPORTED if the given pin does not have analog capability.
+ *
+ * @code
+ * DevicePin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
+ * 
+ * P0.getAnalogValue(); // P0 is a value in the range of 0 - 1024
+ * @endcode
+ */
 int NRF52Pin::getAnalogValue()
 {
 
@@ -500,28 +503,33 @@ int NRF52Pin::isAnalog()
     return (status & (IO_STATUS_ANALOG_IN | IO_STATUS_ANALOG_OUT)) == 0 ? 0 : 1;
 }
 
-
 /**
-  * Configures this IO pin as a "makey makey" style touch sensor (if necessary)
-  * and tests its current debounced state.
-  *
-  * Users can also subscribe to DeviceButton events generated from this pin.
-  *
-  * @return 1 if pin is touched, 0 if not, or DEVICE_NOT_SUPPORTED if this pin does not support touch capability.
-  *
-  * @code
-  * DeviceMessageBus bus;
-  *
-  * DevicePin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_ALL);
-  * if(P0.isTouched())
-  * {
-  *     //do something!
-  * }
-  *
-  * // subscribe to events generated by this pin!
-  * bus.listen(DEVICE_ID_IO_P0, DEVICE_BUTTON_EVT_CLICK, someFunction);
-  * @endcode
-  */
+ * Configures this IO pin as a "makey makey" style touch sensor (if necessary)
+ * and tests its current debounced state.
+ *
+ * Users can also subscribe to DeviceButton events generated from this pin.
+ *
+ * @return 1 if pin is touched, 0 if not, or DEVICE_NOT_SUPPORTED if this pin does not support touch capability.
+ *
+ * @code
+ * 
+ * DeviceMessageBus bus;
+ *
+ * DevicePin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_ALL);
+ * 
+ * if(P0.isTouched())
+ * 
+ * {
+ * 
+ *     //do something!
+ * 
+ * }
+ *
+ * // subscribe to events generated by this pin!
+ * 
+ * bus.listen(DEVICE_ID_IO_P0, DEVICE_BUTTON_EVT_CLICK, someFunction);
+ * @endcode
+ */
 int NRF52Pin::isTouched()
 {
     // Maintain the last type of sensing used.
@@ -530,27 +538,32 @@ int NRF52Pin::isTouched()
 
 
 /**
-  * Configures this IO pin as a "makey makey" style touch sensor (if necessary)
-  * and tests its current debounced state.
-  *
-  * Users can also subscribe to Button events generated from this pin.
-  *
-  * @param mode Type of sensing to use (resistive or capacitative)
-  * @return 1 if pin is touched, 0 if not, or DEVICE_NOT_SUPPORTED if this pin does not support touch capability.
-  *
-  * @code
-  * DeviceMessageBus bus;
-  *
-  * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_ALL);
-  * if(P0.isTouched())
-  * {
-  *     //do something!
-  * }
-  *
-  * // subscribe to events generated by this pin!
-  * bus.listen(DEVICE_ID_IO_P0, DEVICE_BUTTON_EVT_CLICK, someFunction);
-  * @endcode
-  */
+ * Configures this IO pin as a "makey makey" style touch sensor (if necessary)
+ * and tests its current debounced state.
+ *
+ * Users can also subscribe to DeviceButton events generated from this pin.
+ * @param mode Type of sensing to use (resistive or capacitative)
+ * @return 1 if pin is touched, 0 if not, or DEVICE_NOT_SUPPORTED if this pin does not support touch capability.
+ *
+ * @code
+ * 
+ * DeviceMessageBus bus;
+ *
+ * DevicePin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_ALL);
+ * 
+ * if(P0.isTouched())
+ * 
+ * {
+ * 
+ *    //do something!
+ * 
+ * }
+ *
+ * // subscribe to events generated by this pin!
+ * 
+ * bus.listen(DEVICE_ID_IO_P0, DEVICE_BUTTON_EVT_CLICK, someFunction);
+ * @endcode
+ */
 int NRF52Pin::isTouched(TouchMode touchMode)
 {
     //check if this pin has a touch mode...
@@ -588,12 +601,39 @@ int NRF52Pin::isTouched(TouchMode touchMode)
     return ((Button *)obj)->isPressed();
 }
 
+
+/**
+ * Configures this pin as a "makey makey" style touch sensor (if required) and tests if at any point the pin has
+ * been touched _since the last time_ this was called.
+ *
+ * Note that holding the pin in the 'touched' state will only generate one event, so this can be viewed as a kind
+ * of 'falling edge' detection, where only a not-touched followed by a touched event must occur to increment the count.
+ *
+ * For this to work, the there must be two sequential `wasTouched` calls with no other pin
+ * mode changes in between for this pin, otherwise the touch count will be reset.
+ *
+ * @return int The number of touch events since the last call.
+ */
 int NRF52Pin::wasTouched()
 {
     // Maintain the last type of sensing used.
     return wasTouched(status & IO_STATUS_CAPACITATIVE_TOUCH ? TouchMode::Capacitative : TouchMode::Resistive);
 }
 
+
+/**
+ * Configures this pin as a "makey makey" style touch sensor (if required) and tests if at any point the pin has
+ * been touched _since the last time_ this was called.
+ *
+ * Note that holding the pin in the 'touched' state will only generate one event, so this can be viewed as a kind
+ * of 'falling edge' detection, where only a not-touched followed by a touched event must occur to increment the count.
+ *
+ * For this to work, the there must be two sequential `wasTouched` calls with the same parameter used with no other pin
+ * mode changes in between for this pin, otherwise the touch count will be reset.
+ *
+ * @param touchMode Which touch mode to use this pin in.
+ * @return int The number of touch events since the last call.
+ */
 int NRF52Pin::wasTouched(TouchMode touchMode)
 {
     TouchMode currentTouchMode = (status & IO_STATUS_CAPACITATIVE_TOUCH) ? TouchMode::Capacitative : TouchMode::Resistive;
@@ -859,36 +899,43 @@ int NRF52Pin::disableEvents()
 
     return DEVICE_OK;
 }
-
 /**
-  * Configures the events generated by this Pin instance.
-  *
-  * DEVICE_PIN_EVENT_ON_EDGE - Configures this pin to a digital input, and generates events whenever a rise/fall is detected on this pin. (DEVICE_PIN_EVT_RISE, DEVICE_PIN_EVT_FALL)
-  * DEVICE_PIN_EVENT_ON_PULSE - Configures this pin to a digital input, and generates events where the timestamp is the duration that this pin was either HI or LO. (DEVICE_PIN_EVT_PULSE_HI, DEVICE_PIN_EVT_PULSE_LO)
-  * DEVICE_PIN_EVENT_ON_TOUCH - Configures this pin as a makey makey style touch sensor, in the form of a Button. Normal button events will be generated using the ID of this pin.
-  * DEVICE_PIN_EVENT_NONE - Disables events for this pin.
-  *
-  * @param eventType One of: DEVICE_PIN_EVENT_ON_EDGE, DEVICE_PIN_EVENT_ON_PULSE, DEVICE_PIN_EVENT_ON_TOUCH, DEVICE_PIN_EVENT_NONE
-  *
-  * @code
-  * DeviceMessageBus bus;
-  *
-  * Pin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
-  * P0.eventOn(DEVICE_PIN_EVENT_ON_PULSE);
-  *
-  * void onPulse(Event evt)
-  * {
-  *     int duration = evt.timestamp;
-  * }
-  *
-  * bus.listen(DEVICE_ID_IO_P0, DEVICE_PIN_EVT_PULSE_HI, onPulse, MESSAGE_BUS_LISTENER_IMMEDIATE)
-  * @endcode
-  *
-  * @return DEVICE_OK on success, or DEVICE_INVALID_PARAMETER if the given eventype does not match
-  *
-  * @note In the DEVICE_PIN_EVENT_ON_PULSE mode, the smallest pulse that was reliably detected was 85us, around 5khz. If more precision is required,
-  *       please use the InterruptIn class supplied by ARM mbed.
-  */
+ * Configures the events generated by this DevicePin instance.
+ *
+ * DEVICE_PIN_EVENT_ON_EDGE - Configures this pin to a digital input, and generates events whenever a rise/fall is detected on this pin. (DEVICE_PIN_EVT_RISE, DEVICE_PIN_EVT_FALL)
+ * 
+ * DEVICE_PIN_EVENT_ON_PULSE - Configures this pin to a digital input, and generates events where the timestamp is the duration that this pin was either HI or LO. (DEVICE_PIN_EVT_PULSE_HI, DEVICE_PIN_EVT_PULSE_LO)
+ * 
+ * DEVICE_PIN_EVENT_ON_TOUCH - Configures this pin as a makey makey style touch sensor, in the form of a DeviceButton. Normal button events will be generated using the ID of this pin.
+ * 
+ * DEVICE_PIN_EVENT_NONE - Disables events for this pin.
+ *
+ * @param eventType One of: DEVICE_PIN_EVENT_ON_EDGE, DEVICE_PIN_EVENT_ON_PULSE, DEVICE_PIN_EVENT_ON_TOUCH, DEVICE_PIN_EVENT_NONE
+ *
+ * @code
+ * DeviceMessageBus bus;
+ *
+ * DevicePin P0(DEVICE_ID_IO_P0, DEVICE_PIN_P0, PIN_CAPABILITY_BOTH);
+ * 
+ * P0.eventOn(DEVICE_PIN_EVENT_ON_PULSE);
+ *
+ * void onPulse(Event evt)
+ * 
+ * {
+ * 
+ *     int duration = evt.timestamp;
+ * 
+ * }
+ *
+ * bus.listen(DEVICE_ID_IO_P0, DEVICE_PIN_EVT_PULSE_HI, onPulse, MESSAGE_BUS_LISTENER_IMMEDIATE)
+ * 
+ * @endcode
+ *
+ * @return DEVICE_OK on success, or DEVICE_INVALID_PARAMETER if the given eventype does not match
+ *
+ * @note In the DEVICE_PIN_EVENT_ON_PULSE mode, the smallest pulse that was reliably detected was 85us, around 5khz. If more precision is required,
+ *       please use the InterruptIn class supplied by ARM mbed.
+ */
 int NRF52Pin::eventOn(int eventType)
 {
     switch(eventType)
