@@ -62,7 +62,6 @@ class NRF52ADC;
 class NRF52ADCChannel : public DataSource
 {
 private:
-
     NRF52ADC            &adc;
     ManagedBuffer       buffer;
     volatile int16_t    lastSample;
