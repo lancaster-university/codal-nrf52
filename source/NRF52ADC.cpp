@@ -81,16 +81,14 @@ NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), sta
 /**
  * Indicates a downstream channel may want to start/stop the flow of data
  */
-void NRF52ADCChannel::dataWanted(bool wanted)
+void NRF52ADCChannel::dataWanted(int wanted)
 {
-    DMESG("dataWanted indication: DataWanted = %d", wanted);
-
     bool enabled = (status & NRF52_ADC_CHANNEL_STATUS_ENABLED);
 
-    if (wanted && !enabled)
+    if (wanted == DATASTREAM_WANTED && !enabled)
         enable();
 
-    if (!wanted && enabled)
+    if ((wanted == DATASTREAM_NOT_WANTED || wanted == DATASTREAM_DONT_CARE) && enabled)
         disable();
 }
 
@@ -724,21 +722,16 @@ NRF52ADCChannel* NRF52ADC::getChannel(Pin& pin, bool activate)
  */
 int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
 {
-    DMESG("ACTIVATING CHANNEL %p", channel);
-
     if(channel==NULL)
         return DEVICE_INVALID_PARAMETER;
 
-    DMESG("ACTIVATING CHANNEL [VALID]");
     if (!channel->isEnabled())
     {
-        DMESG("ACTIVATING CHANNEL [NOT ENABLED... RESETING]");
         stopRunning();
         channel->enable();
         startRunning();
     }
 
-    DMESG("ACTIVATING CHANNEL [DONE]");
     return DEVICE_OK;
 }
 

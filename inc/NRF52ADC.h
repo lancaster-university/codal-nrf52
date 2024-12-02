@@ -100,7 +100,7 @@ public:
     /**
      * Indicates a downstream channel may want to start/stop the flow of data
      */
-    virtual void dataWanted(bool wanted);
+    virtual void dataWanted(int wanted);
 
     /**
      * Update our reference to a downstream component.
