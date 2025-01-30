@@ -73,6 +73,7 @@ NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), sta
     this->gain = 2;
     this->bias = 0;
     this->lastSample = 0;
+    this->startupDelay = 0;
 
     // Define our output stream as non-blocking.
     output.setBlocking(false);
@@ -316,6 +317,14 @@ int NRF52ADCChannel::getBias()
 }
 
 /**
+ * Define the startup delay associated with this channel
+ */
+void NRF52ADCChannel::setStartDelay(uint8_t value)
+{
+    this->startupDelay = value;
+}
+
+/**
  * Demultiplexes the current DMA output buffer into the buffer of this channel.
  * 
  * @param data the DMA buffer to read from
@@ -330,8 +339,12 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int o
     int16_t *end = data + length;
     data += offset;
 
-    if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0)
+    // If we're not enabled, or in a warm-up period, then nothing to do.
+    if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0 || startupDelay)
+    {
+        if(startupDelay) startupDelay--;
         return;
+    }
 
     // If this buffer is too shot to contain information for us, ignore it.
     // n.b. The above test is safe, as a short buffer implies that our lastSample is already up to date.

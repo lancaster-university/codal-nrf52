@@ -71,6 +71,7 @@ private:
     uint8_t             channel;
     uint8_t             gain;
     uint8_t             bias;
+    uint8_t             startupDelay;
  
 public:
     DataStream      output;
@@ -198,6 +199,11 @@ public:
      *
      */
     void configureGain();
+
+    /**
+     * Define the startup delay associated with this channel
+     */
+    void setStartDelay(uint8_t value);
     
     /**
     * Demultiplexes the current DMA output buffer into the buffer of this channel.
