@@ -65,18 +65,32 @@ extern "C" void SAADC_IRQHandler()
  * @param adc reference to the ADC hardware used by this channel
  * @param channel The analog identifier of this channel
  */
-NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), output(*this)
+NRF52ADCChannel::NRF52ADCChannel(NRF52ADC &adc, uint8_t channel) : adc(adc), status(0), output(*this)
 {
     this->channel = channel;
     this->size = buffer.length();
     this->bufferSize = NRF52_ADC_DMA_SIZE;
     this->gain = 2;
     this->bias = 0;
-    this->status = 0;
     this->lastSample = 0;
+    this->startupDelay = 0;
 
     // Define our output stream as non-blocking.
     output.setBlocking(false);
+}
+
+/**
+ * Indicates a downstream channel may want to start/stop the flow of data
+ */
+void NRF52ADCChannel::dataWanted(int wanted)
+{
+    bool enabled = (status & NRF52_ADC_CHANNEL_STATUS_ENABLED);
+
+    if (wanted == DATASTREAM_WANTED && !enabled)
+        enable();
+
+    if ((wanted == DATASTREAM_NOT_WANTED || wanted == DATASTREAM_DONT_CARE) && enabled)
+        disable();
 }
 
 /**
@@ -100,7 +114,8 @@ int NRF52ADCChannel::setFormat(int format)
 }
 
 float NRF52ADCChannel::getSampleRate() {
-    return 1000000 / this->adc.getSamplePeriod(); // Note: getSamplePeriod returns in uS.
+    int v = 1000000 / this->adc.getSamplePeriod(); // Note: getSamplePeriod returns in uS. 
+    return v;
 }
 
 float NRF52ADCChannel::requestSampleRate( float sampleRate )
@@ -161,7 +176,6 @@ int NRF52ADCChannel::isEnabled()
     return status & NRF52_ADC_CHANNEL_STATUS_ENABLED;
 }
 
-
 /**
  * Update our reference to a downstream component.
  *
@@ -169,7 +183,10 @@ int NRF52ADCChannel::isEnabled()
  */
 void NRF52ADCChannel::connect(DataSink& component)
 {
+    DMESG("ADCChannel: %p Connected to: %p", this, &component);
     this->status |= NRF52_ADC_CHANNEL_STATUS_CONNECTED;
+    DMESG("ADCChannel: status [%x]", this->status);
+    DMESG("ADCChannel: [%p]: %s\n", this, this->isConnected() ? "CONNECTED" : "NOT CONNECTED"); 
 }
 
 bool NRF52ADCChannel::isConnected()
@@ -300,6 +317,14 @@ int NRF52ADCChannel::getBias()
 }
 
 /**
+ * Define the startup delay associated with this channel
+ */
+void NRF52ADCChannel::setStartDelay(uint8_t value)
+{
+    this->startupDelay = value;
+}
+
+/**
  * Demultiplexes the current DMA output buffer into the buffer of this channel.
  * 
  * @param data the DMA buffer to read from
@@ -314,8 +339,12 @@ void NRF52ADCChannel::demux(ManagedBuffer dmaBuffer, int offset, int skip, int o
     int16_t *end = data + length;
     data += offset;
 
-    if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0)
+    // If we're not enabled, or in a warm-up period, then nothing to do.
+    if ((status & NRF52_ADC_CHANNEL_STATUS_ENABLED) == 0 || startupDelay)
+    {
+        if(startupDelay) startupDelay--;
         return;
+    }
 
     // If this buffer is too shot to contain information for us, ignore it.
     // n.b. The above test is safe, as a short buffer implies that our lastSample is already up to date.
@@ -502,6 +531,7 @@ void NRF52ADC::enable()
  */
 void NRF52ADC::disable()
 {
+    DMESG("NRF52ADC: DISABLING....");
     stopRunning();
     NRF_SAADC->ENABLE = 0;
 
@@ -529,6 +559,8 @@ int NRF52ADC::getSamplePeriod()
  */
 int NRF52ADC::setSamplePeriod(int samplePeriod)
 {
+    DMESG("NRF52ADC: setSamplePeriod()....");
+
     bool wasRunning = stopRunning();
     // Store the sample rate for later.
     this->samplePeriod = samplePeriod;
@@ -621,6 +653,7 @@ int NRF52ADC::getDmaBufferSize()
  */
 int NRF52ADC::setDmaBufferSize(int bufferSize)
 {
+    DMESG("NRF52ADC: SET_DMA_BUFFERSIZE....");
     bool wasRunning = stopRunning();
     this->bufferSize = bufferSize;
     if (wasRunning)
@@ -711,6 +744,7 @@ int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
         channel->enable();
         startRunning();
     }
+
     return DEVICE_OK;
 }
 
@@ -722,6 +756,8 @@ int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
 int NRF52ADC::releaseChannel(Pin& pin)
 {
     int c;
+
+    DMESG("RELEASING CHANNEL");
 
     if (!nrf52_saadc_id.hasKey(pin.name))
         return DEVICE_INVALID_PARAMETER;
@@ -748,6 +784,8 @@ int NRF52ADC::releaseChannel(Pin& pin)
 int
 NRF52ADC::releasePin(Pin &pin)
 {
+    DMESG("RELEASING PIN");
+
     NRF52ADCChannel *c = getChannel(pin, false);
 
     if (c != NULL)
@@ -765,6 +803,8 @@ NRF52ADC::releasePin(Pin &pin)
 
 bool NRF52ADC::stopRunning()
 {
+    DMESG("ADC: STOPPING");
+
     if ( !running)
       return false;
 
@@ -782,6 +822,8 @@ bool NRF52ADC::stopRunning()
 
 bool NRF52ADC::startRunning()
 {
+    DMESG("ADC: STARTING");
+
     if ( running)
         return true;
 
@@ -873,6 +915,7 @@ int NRF52ADC::setSleep(bool doSleep)
 
     if (doSleep)
     {
+        DMESG("NRF52ADC: SLEEPING....");
         wasRunning = stopRunning();
         wasEnabled = NVIC_GetEnableIRQ(SAADC_IRQn);
         if (wasEnabled)

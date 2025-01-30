@@ -62,7 +62,6 @@ class NRF52ADC;
 class NRF52ADCChannel : public DataSource
 {
 private:
-
     NRF52ADC            &adc;
     ManagedBuffer       buffer;
     volatile int16_t    lastSample;
@@ -72,6 +71,7 @@ private:
     uint8_t             channel;
     uint8_t             gain;
     uint8_t             bias;
+    uint8_t             startupDelay;
  
 public:
     DataStream      output;
@@ -98,6 +98,10 @@ public:
      */
     int isEnabled();
 
+    /**
+     * Indicates a downstream channel may want to start/stop the flow of data
+     */
+    virtual void dataWanted(int wanted);
 
     /**
      * Update our reference to a downstream component.
@@ -195,6 +199,11 @@ public:
      *
      */
     void configureGain();
+
+    /**
+     * Define the startup delay associated with this channel
+     */
+    void setStartDelay(uint8_t value);
     
     /**
     * Demultiplexes the current DMA output buffer into the buffer of this channel.
