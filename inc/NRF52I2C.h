@@ -54,9 +54,10 @@ public:
      */
     virtual ~NRF52I2C();
 
-    /** Set the frequency of the I2C interface
+    /** 
+     * Set the frequency of the I2C interface
      *
-     * @param frequency The bus frequency in hertz
+     * @param frequency The bus frequency in hertz.
      */
     virtual int setFrequency(uint32_t frequency);
 
@@ -71,26 +72,30 @@ public:
 
     /**
       * Method to release the given pin from a peripheral, if already bound.
-      * Device drivers should override this method to disconnect themselves from the give pin
+      * Device drivers should override this method to disconnect themselves from the given pin
       * to allow it to be used by a different peripheral.
       *
-      * @param pin the Pin to be released
+      * @param pin the Pin to be released.
       */
     virtual int releasePin(Pin &pin) override;
 
     /**
     * Issues a standard, I2C command write to the I2C bus.
     * This consists of:
+    * 
     *  - Asserting a Start condition on the bus
+    * 
     *  - Selecting the Slave address (as an 8 bit address)
+    * 
     *  - Writing a number of raw data bytes provided
+    * 
     *  - Asserting a Stop condition on the bus
     *
     * The CPU will busy wait until the transmission is complete.
     *
-    * @param address The 8bit I2C address of the device to write to
-    * @param data pointer to the bytes to write
-    * @param len the number of bytes to write
+    * @param address The 8bit I2C address of the device to write to. This parameter expects the hardware address shifted left once.
+    * @param data pointer to the bytes to write.
+    * @param len the number of bytes to write.
     * @param repeated Suppresses the generation of a STOP condition if set. Default: false;
     *
     * @return DEVICE_OK on success, DEVICE_I2C_ERROR if the the write request failed.
@@ -100,14 +105,18 @@ public:
     /**
       * Issues a standard, 2 byte I2C command read to the I2C bus.
       * This consists of:
-      *  - Asserting a Start condition on the bus
-      *  - Selecting the Slave address (as an 8 bit address)
-      *  - reading "len" bytes of raw 8 bit data into the buffer provided
-      *  - Asserting a Stop condition on the bus
+      * 
+      *  - Asserting a Start condition on the bus.
+      * 
+      *  - Selecting the Slave address (as an 8 bit address).
+      * 
+      *  - reading "len" bytes of raw 8 bit data into the buffer provided.
+      * 
+      *  - Asserting a Stop condition on the bus.
       *
       * The CPU will busy wait until the transmission is complete.
       *
-      * @param address The 8bit I2C address of the device to read from
+      * @param address The 8bit I2C address of the device to read from. This parameter expects the hardware address shifted left once.
       * @param data pointer to store the the bytes read
       * @param len the number of bytes to read into the buffer
       * @param repeated Suppresses the generation of a STOP condition if set. Default: false;
@@ -119,18 +128,26 @@ public:
     /**
       * Performs a typical register read operation to the I2C slave device provided.
       * This consists of:
-      *  - Asserting a Start condition on the bus
-      *  - Selecting the Slave address (as an 8 bit address, I2C WRITE)
-      *  - Selecting a RAM register address in the slave
-      *  - Asserting a Stop condition on the bus
-      *  - Asserting a Start condition on the bus
-      *  - Selecting the Slave address (as an 8 bit address, I2C READ)
-      *  - Performing an 8 bit read operation (of the requested register)
-      *  - Asserting a Stop condition on the bus
+      * 
+      *  - Asserting a Start condition on the bus.
+      * 
+      *  - Selecting the Slave address (as an 8 bit address, I2C WRITE).
+      * 
+      *  - Selecting a RAM register address in the slave.
+      * 
+      *  - Asserting a Stop condition on the bus.
+      * 
+      *  - Asserting a Start condition on the bus.
+      * 
+      *  - Selecting the Slave address (as an 8 bit address, I2C READ).
+      * 
+      *  - Performing an 8 bit read operation (of the requested register).
+      * 
+      *  - Asserting a Stop condition on the bus.
       *
-      * The CPU will busy wait until the transmission is complete..
+      * The CPU will busy wait until the transmission is complete.
       *
-      * @param address 8bit I2C address of the device to read from
+      * @param address 8bit I2C address of the device to read from. This parameter expects the hardware address shifted left once.
       * @param reg The 8bit register address of the to read.
       * @param data A pointer to a memory location to store the result of the read operation
       * @param length The number of mytes to read
