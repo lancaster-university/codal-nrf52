@@ -32,8 +32,9 @@ static NRF52TouchSensor *instance = NULL;
 
 static void touch_sense_irq(uint16_t mask)
 {
+    Event evt;
     if (instance)
-        instance->onSampleEvent();
+        instance->onSampleEvent(evt);
 }
 
 /**
@@ -107,7 +108,7 @@ extern void calibrateTest(float sample);
  * Initiate a scan of the sensors.
  */
 void 
-NRF52TouchSensor::onSampleEvent()
+NRF52TouchSensor::onSampleEvent(Event)
 {
     int result;
 
