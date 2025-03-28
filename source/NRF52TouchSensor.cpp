@@ -32,9 +32,10 @@ static NRF52TouchSensor *instance = NULL;
 
 static void touch_sense_irq(uint16_t mask)
 {
-    Event evt;
-    if (instance)
+    if (instance) {
+        Event evt;
         instance->onSampleEvent(evt);
+    }
 }
 
 /**
