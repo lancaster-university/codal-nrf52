@@ -75,7 +75,7 @@ namespace codal
         /**
          * Initiate a scan of the sensors.
          */
-        void onSampleEvent();
+        void onSampleEvent(Event) override;
 
     };
 }
