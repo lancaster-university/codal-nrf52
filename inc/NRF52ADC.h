@@ -324,11 +324,12 @@ public:
     int activateChannel(NRF52ADCChannel *channel);
 
     /**
-     * Release a previously a new ADC channel, if available, for the given pin.
-     * @param pin The pin to detach.
+     * Release a previously activated ADC channel.
+     * @param channel The channel to detach.
      * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if the given pin was not connected to the ADC.
+     * n.b. Use "getChannel(Pin& pin, false)" to acquire the ADC channel for a given pin instance.
      */
-    int releaseChannel(Pin& pin);
+    int releaseChannel(NRF52ADCChannel *channel);
 
     /**
     * Method to release the given pin from a peripheral, if already bound.

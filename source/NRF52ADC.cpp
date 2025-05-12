@@ -87,10 +87,16 @@ void NRF52ADCChannel::dataWanted(int wanted)
     bool enabled = (status & NRF52_ADC_CHANNEL_STATUS_ENABLED);
 
     if (wanted == DATASTREAM_WANTED && !enabled)
+    {
+        adc.activateChannel(this);
         enable();
+    }
 
     if ((wanted == DATASTREAM_NOT_WANTED || wanted == DATASTREAM_DONT_CARE) && enabled)
+    {
+        adc.releaseChannel(this);
         disable();
+    }
 }
 
 /**
@@ -749,25 +755,22 @@ int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
 }
 
 /**
- * Release a previously a new ADC channel, if available, for the given pin.
- * @param pin The pin to detach.
+ * Release a previously activated ADC channel.
+ * @param channel The channel to detach.
  * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if the given pin was not connected to the ADC.
+ * n.b. Use "getChannel(Pin& pin, false)" to acquire the ADC channel for a given pin instance.
  */
-int NRF52ADC::releaseChannel(Pin& pin)
+int NRF52ADC::releaseChannel(NRF52ADCChannel *channel)
 {
-    int c;
-
     DMESG("RELEASING CHANNEL");
 
-    if (!nrf52_saadc_id.hasKey(pin.name))
+    if (channel == NULL)
         return DEVICE_INVALID_PARAMETER;
 
-    c = nrf52_saadc_id.get(pin.name) - 1;
-
-    if (channels[c].isEnabled())
+    if (channel->isEnabled())
     {
         bool wasRunning = stopRunning();
-        channels[c].disable();
+        channel->disable();
         if (wasRunning)
             startRunning();
     }
@@ -791,7 +794,7 @@ NRF52ADC::releasePin(Pin &pin)
     if (c != NULL)
     {
         // Release the ADC channel, and wait for it to be fully disabled before continuing.
-        releaseChannel(pin);
+        releaseChannel(c);
         while(c->isEnabled());
     }
 
