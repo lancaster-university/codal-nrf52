@@ -131,7 +131,7 @@ public:
 
     virtual float getSampleRate();
     
-    virtual float requestSampleRate(float sampleRate);
+    virtual float setSampleRate(float sampleRate);
 
     /**
      *  Determine the buffer size this channel will use for data streaming.

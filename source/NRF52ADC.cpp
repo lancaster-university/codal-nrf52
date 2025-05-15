@@ -124,11 +124,10 @@ float NRF52ADCChannel::getSampleRate() {
     return v;
 }
 
-float NRF52ADCChannel::requestSampleRate( float sampleRate )
+float NRF52ADCChannel::setSampleRate( float sampleRate )
 {
     int newPeriod = 1000000 / sampleRate;
-    if( this->adc.getSamplePeriod() > newPeriod ) // Note: getSamplePeriod returns in uS.
-        this->adc.setSamplePeriod( newPeriod );
+    this->adc.setSamplePeriod( newPeriod );
     
     return this->getSampleRate();
 }
@@ -762,7 +761,7 @@ int NRF52ADC::activateChannel(NRF52ADCChannel *channel)
  */
 int NRF52ADC::releaseChannel(NRF52ADCChannel *channel)
 {
-    DMESG("RELEASING CHANNEL");
+    //DMESG("RELEASING CHANNEL");
 
     if (channel == NULL)
         return DEVICE_INVALID_PARAMETER;
@@ -787,7 +786,7 @@ int NRF52ADC::releaseChannel(NRF52ADCChannel *channel)
 int
 NRF52ADC::releasePin(Pin &pin)
 {
-    DMESG("RELEASING PIN");
+    //DMESG("RELEASING PIN");
 
     NRF52ADCChannel *c = getChannel(pin, false);
 
@@ -806,7 +805,7 @@ NRF52ADC::releasePin(Pin &pin)
 
 bool NRF52ADC::stopRunning()
 {
-    DMESG("ADC: STOPPING");
+    //DMESG("ADC: STOPPING");
 
     if ( !running)
       return false;
@@ -825,7 +824,7 @@ bool NRF52ADC::stopRunning()
 
 bool NRF52ADC::startRunning()
 {
-    DMESG("ADC: STARTING");
+    //DMESG("ADC: STARTING");
 
     if ( running)
         return true;
