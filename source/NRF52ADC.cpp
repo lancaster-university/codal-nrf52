@@ -126,6 +126,9 @@ float NRF52ADCChannel::getSampleRate() {
 
 float NRF52ADCChannel::setSampleRate( float sampleRate )
 {
+    if (sampleRate < 1.0f || sampleRate > 1000000.0f)
+        return this->getSampleRate();
+
     int newPeriod = 1000000 / sampleRate;
     this->adc.setSamplePeriod( newPeriod );
     
