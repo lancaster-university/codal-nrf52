@@ -62,7 +62,6 @@ class NRF52ADC;
 class NRF52ADCChannel : public DataSource
 {
 private:
-
     NRF52ADC            &adc;
     ManagedBuffer       buffer;
     volatile int16_t    lastSample;
@@ -72,6 +71,7 @@ private:
     uint8_t             channel;
     uint8_t             gain;
     uint8_t             bias;
+    uint8_t             startupDelay;
  
 public:
     DataStream      output;
@@ -98,6 +98,10 @@ public:
      */
     int isEnabled();
 
+    /**
+     * Indicates a downstream channel may want to start/stop the flow of data
+     */
+    virtual void dataWanted(int wanted);
 
     /**
      * Update our reference to a downstream component.
@@ -127,7 +131,7 @@ public:
 
     virtual float getSampleRate();
     
-    virtual float requestSampleRate(float sampleRate);
+    virtual float setSampleRate(float sampleRate);
 
     /**
      *  Determine the buffer size this channel will use for data streaming.
@@ -195,6 +199,11 @@ public:
      *
      */
     void configureGain();
+
+    /**
+     * Define the startup delay associated with this channel
+     */
+    void setStartDelay(uint8_t value);
     
     /**
     * Demultiplexes the current DMA output buffer into the buffer of this channel.
@@ -315,11 +324,12 @@ public:
     int activateChannel(NRF52ADCChannel *channel);
 
     /**
-     * Release a previously a new ADC channel, if available, for the given pin.
-     * @param pin The pin to detach.
+     * Release a previously activated ADC channel.
+     * @param channel The channel to detach.
      * @return DEVICE_OK on success, DEVICE_INVALID_PARAMETER if the given pin was not connected to the ADC.
+     * n.b. Use "getChannel(Pin& pin, false)" to acquire the ADC channel for a given pin instance.
      */
-    int releaseChannel(Pin& pin);
+    int releaseChannel(NRF52ADCChannel *channel);
 
     /**
     * Method to release the given pin from a peripheral, if already bound.
