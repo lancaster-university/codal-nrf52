@@ -23,7 +23,6 @@ DEALINGS IN THE SOFTWARE.
 */
 
 #include "WS2812B.h"
-
 using namespace codal;
 
 /**
@@ -139,7 +138,7 @@ void WS2812B::playAsync(const void *data, int length)
  */
 void WS2812B::playAsync(ManagedBuffer b)
 {
-    this->play(&b[0], b.length());
+    this->playAsync(&b[0], b.length());
 }
 
 /**
