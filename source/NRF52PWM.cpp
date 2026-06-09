@@ -28,6 +28,14 @@ void nrf52_pwm2_irq(void)
         NRF52PWM::nrf52_pwm_driver[2]->irq();
 }
 
+void nrf52_pwm3_irq(void)
+{
+    // Simply pass on to the driver component handler.
+    if (NRF52PWM::nrf52_pwm_driver[3])
+        NRF52PWM::nrf52_pwm_driver[3]->irq();
+}
+
+
 // Handles on the instances of this class used the three PWM modules (if present)
 NRF52PWM* NRF52PWM::nrf52_pwm_driver[NRF52PWM_PWM_PERIPHERALS] = { NULL };
 
@@ -94,6 +102,13 @@ NRF52PWM::NRF52PWM(NRF_PWM_Type *module, DataSource &source, float sampleRate, u
         NVIC_EnableIRQ(PWM2_IRQn);
     }
 
+    if (&PWM == NRF_PWM3)
+    {
+        nrf52_pwm_driver[3] = this;
+        NVIC_SetVector( PWM3_IRQn, (uint32_t) nrf52_pwm3_irq );
+        NVIC_ClearPendingIRQ(PWM3_IRQn);
+        NVIC_EnableIRQ(PWM3_IRQn);
+    }
     // Enable the PWM module
     enable();
 

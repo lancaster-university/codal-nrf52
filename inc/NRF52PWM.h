@@ -12,7 +12,7 @@
 #define NRF52PWM_DEFAULT_FREQUENCY 16000
 #endif
 
-#define NRF52PWM_PWM_PERIPHERALS    3
+#define NRF52PWM_PWM_PERIPHERALS    4
 #define NRF52PWM_PWM_CHANNELS       4
 
 // This "using namespace codal" cannot be removed from this header file without
