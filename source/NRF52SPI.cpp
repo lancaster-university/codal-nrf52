@@ -146,6 +146,9 @@ void NRF52SPI::config()
 
     nrf_spim_disable(p_spim);
 
+    ((NRF52Pin*)mosi)->setHighDrive(true);
+    ((NRF52Pin*)sck)->setHighDrive(true);
+    
     uint32_t mosi_pin = 0xffffffff;
     uint32_t miso_pin = 0xffffffff;
     uint32_t sck_pin = 0xffffffff;
