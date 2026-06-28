@@ -49,11 +49,11 @@ namespace codal
         int             outputBufferSize;       // The maximum size of an output buffer.
 
         uint8_t         *data;                  // The input data being played (immutable)
-        int             samplesToSend;          // The length of the input buffer (mutable)
-        int             samplesSent;            // The number of bytes sent so far in the current request
+        volatile int    samplesToSend;          // The length of the input buffer (mutable)
+        volatile int    samplesSent;            // The number of bytes sent so far in the current request
 
         DataSink        *downstream;            // Pointer to our downstream component
-        bool            blockingPlayout;        // Set to true if a blocking playout has been requested
+        volatile bool   blockingPlayout;        // Set to true if a blocking playout has been requested
         FiberLock       lock;                   // used to synchronise blocking play calls.
 
         public:
@@ -67,9 +67,9 @@ namespace codal
         WS2812B();
 
         /**
-         * Provide the next available ManagedBuffer to our downstream caller, if available.
+         * Provide the next lump of data to our downstream caller using an existing ManagerBuffer.
          */
-        virtual ManagedBuffer pull();
+        virtual void pull(ManagedBuffer &buffer);
 
         /**
          *  Determine the data format of the buffers streamed out of this component.
@@ -80,6 +80,11 @@ namespace codal
          * Allow out downstream component to register itself with us
          */
         virtual void connect(DataSink &sink);
+
+        /**
+         * Downstream caller uses this to indicate all data has been sent.
+         */
+        virtual void dataWanted(int wanted);
 
         /**
          *  Determine the maximum size of the buffers streamed out of this component.

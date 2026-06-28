@@ -15,16 +15,32 @@ void codal::neopixel_send_buffer(Pin &pin, const uint8_t *ptr, int numBytes)
 
     if (pwm == NULL)
     {
+#if NRF52PWM_STATS > 0
+        // Enable Data Watchpoint and Trace Unit (DWT) Cycle Counter
+        // This is needed if not running under a debugger
+        CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+        DWT->CYCCNT = 0;
+        DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+#endif
         ws = new WS2812B();
         pwm = new NRF52PWM(NRF_PWM2, *ws, WS2812B_PWM_FREQ);
         pwm->setStreamingMode(true, false);
         pwm->setDecoderMode(PWM_DECODER_LOAD_Common);
-        pwm->setSampleRate(WS2812B_PWM_FREQ);
     }
 
     pwm->connectPin(pin, 0);
 
+#if NRF52PWM_STATS > 0
+    pwm->zeroStats();
+#endif
     ws->play(ptr, numBytes);
+#if NRF52PWM_STATS > 0
+    int samplesPerBuffer = WS2812B_BUFFER_SIZE / 2;
+    int samples = (numBytes * 8 + 2 * WS2812B_ZERO_PADDING);
+    int bufcnt = max(2,
+                     samples / samplesPerBuffer + (samples % samplesPerBuffer > 0 ? 1 : 0));
+    pwm->anomalyCheckStats(bufcnt);
+#endif
 }
 
 #else

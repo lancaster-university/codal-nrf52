@@ -32,11 +32,10 @@ using namespace codal;
  * @param pwm The PWM peripheral to use to generate the output
  * @param pin The pin connected to the WS2812B pixel strip
  */
-WS2812B::WS2812B()
+WS2812B::WS2812B() : lock(0)
 {
     this->downstream = NULL;
     this->setBufferSize(WS2812B_BUFFER_SIZE);
-    lock.wait();
 } 
 
 /*
@@ -79,31 +78,47 @@ WS2812B::setBufferSize(int size)
 }
 
 /**
- * Provide the next available ManagedBuffer to our downstream caller, if available.
+ * Provide the next lump of data to our downstream caller using an existing ManagerBuffer.
  */
-ManagedBuffer WS2812B::pull()
+void WS2812B::pull(ManagedBuffer &buffer)
 {
     // Calculate the amount of data we can transfer in this pull request.
-    // Ensure we send at least two buffers, as most downstream components will likely be double buffered...
+    // Pixels plus RESET periods before and after pixel data
     int totalSamples = max(outputBufferSize, samplesToSend + 2 * WS2812B_ZERO_PADDING);
-    ManagedBuffer buffer(outputBufferSize);
+    
+    // Adjust buffer length if required
+    int curBufLen = buffer.length();
+    if (curBufLen < outputBufferSize)
+        buffer = ManagedBuffer(outputBufferSize, BufferInitialize::None);
+    else if (curBufLen > outputBufferSize)
+        buffer.truncate(outputBufferSize);
 
     uint16_t *out = (uint16_t *) &buffer[0];
     uint16_t *end = (uint16_t *) &buffer[buffer.length()];
 
+    int index = -1;
+    int bit = 0, bitmask =0;
     while (out < end)
     {
         // Add the front/rear padding if aplicable
-        if (samplesSent < WS2812B_ZERO_PADDING || samplesSent > (WS2812B_ZERO_PADDING + samplesToSend))
+        if (samplesSent < WS2812B_ZERO_PADDING || samplesSent >= (WS2812B_ZERO_PADDING + samplesToSend))
         {
             *out = WS2812B_PAD;
         }
         else
         {
-            int index = (samplesSent - WS2812B_ZERO_PADDING) / 8;
-            int bit = (samplesSent - WS2812B_ZERO_PADDING) % 8;
+            if (index < 0) {
+                index = (samplesSent - WS2812B_ZERO_PADDING) / 8;
+                bit = 7 - (samplesSent - WS2812B_ZERO_PADDING) % 8;
+                bitmask = 0x01 << bit;
+            }
 
-            *out = ((data[index] >> (7-bit)) & 1) ? WS2812B_HIGH : WS2812B_LOW;
+            *out = (data[index] & bitmask) ? WS2812B_HIGH : WS2812B_LOW;
+            bitmask >>= 1;
+            if (bitmask == 0) {
+                index++;
+                bitmask = 0x01 << 7;
+            }
         }
 
         out++;
@@ -113,13 +128,20 @@ ManagedBuffer WS2812B::pull()
     // If we still have data to send, indicate this to our downstream component
     if (samplesSent < totalSamples)
         downstream->pullRequest();
-    
-    // If we have completed playback and blockingbehaviour was requested, wake the fiber that is blocked waiting.
-    if ((samplesSent >= totalSamples) && blockingPlayout)
-        lock.notify();
-
-    return buffer;
 }
+
+
+/**
+ * Downstream caller uses this to indicate all data has been sent.
+ * @param wanted set to DATASTREAM_NOT_WANTED to indicate all data sent
+ */
+void WS2812B::dataWanted(int wanted)
+{
+    DataSource::dataWanted(wanted);
+    if (wanted == DATASTREAM_NOT_WANTED && blockingPlayout)
+        lock.notify();
+}
+
 
 /**
  * Perform a non-blocking playout of the given 24 bit RGB/GRB encoded datastream. Thhis method performs no
