@@ -230,6 +230,12 @@ int NRF52Serial::putc(char c)
     while(!target_get_irq_disabled() && is_tx_in_progress_);
 
     if(target_get_irq_disabled()){
+        // Robust polled path (works at any IRQ priority, e.g. inside the SD fault
+        // handler): make sure no DMA transfer is in flight before reprogramming it.
+        nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STOPTX);
+        uint32_t w = 0;
+        while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED) && ++w < 2000000)
+        {}
         nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDTX);
         nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
     }
