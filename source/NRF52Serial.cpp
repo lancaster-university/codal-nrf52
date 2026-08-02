@@ -226,8 +226,24 @@ int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 int NRF52Serial::putc(char c)
 {
     int res = DEVICE_OK;
+    uint32_t spin = 0;
 
-    while(!target_get_irq_disabled() && is_tx_in_progress_);
+    while(!target_get_irq_disabled() && is_tx_in_progress_)
+    {
+        // TX watchdog: if the UARTE IRQ has not cleared the in-flight flag within
+        // ~300ms, force-STOPTX so a wedged transfer cannot hang the whole system.
+        if (++spin > 2000000)
+        {
+            spin = 0;
+            nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STOPTX);
+            uint32_t w = 0;
+            while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED) && ++w < 2000000)
+            {}
+            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDTX);
+            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
+            is_tx_in_progress_ = false;
+        }
+    }
 
     if(target_get_irq_disabled()){
         // Robust polled path (works at any IRQ priority, e.g. inside the SD fault
@@ -247,19 +263,21 @@ int NRF52Serial::putc(char c)
     if(target_get_irq_disabled()){
         bool endtx;
         bool txstopped;
+        uint32_t w = 0;
         do
         {
             endtx     = nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_ENDTX);
             txstopped = nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
         }
-        while ((!endtx) && (!txstopped));
+        while ((!endtx) && (!txstopped) && ++w < 2000000);
         if (txstopped){
             res = DEVICE_INVALID_STATE;
         }else{
             // Transmitter has to be stopped by triggering the STOPTX task to achieve
             // the lowest possible level of the UARTE power consumption.
             nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STOPTX);
-            while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED))
+            w = 0;
+            while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED) && ++w < 2000000)
             {}
         }
         is_tx_in_progress_ = false;
