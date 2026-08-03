@@ -18,6 +18,9 @@ namespace codal
     {
         volatile bool is_tx_in_progress_;
         volatile int  bytesProcessed;
+#if DEVICE_DMESG_BUFFER_SIZE > 0
+        volatile uint32_t txWatchdogCount;
+#endif
         uint8_t dmaBuffer[CONFIG_SERIAL_DMA_BUFFER_SIZE];
 
         NRF_UARTE_Type *p_uarte_;
