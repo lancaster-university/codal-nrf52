@@ -156,6 +156,12 @@ PROCESSOR_WORD_TYPE fiber_initial_stack_base()
     return DEVICE_STACK_BASE;
 }
 
+extern PROCESSOR_WORD_TYPE __StackLimit;
+PROCESSOR_WORD_TYPE stack_limit()
+{
+    return (PROCESSOR_WORD_TYPE)(&__StackLimit);
+}
+
 void *tcb_allocate()
 {
     return (void *)malloc(sizeof(PROCESSOR_TCB));
