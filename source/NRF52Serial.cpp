@@ -16,7 +16,11 @@ extern int8_t target_get_irq_disabled();
  *
  **/
 NRF52Serial::NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device) 
- : Serial(tx, rx), is_tx_in_progress_(false), bytesProcessed(0), p_uarte_(NULL)
+ : Serial(tx, rx), is_tx_in_progress_(false), bytesProcessed(0),
+#if DEVICE_DMESG_BUFFER_SIZE > 0
+   txWatchdogCount(0),
+#endif
+   p_uarte_(NULL)
 {
     if(device != NULL)
         p_uarte_ = (NRF_UARTE_Type*)allocate_peripheral((void*)device);
@@ -226,10 +230,38 @@ int NRF52Serial::configurePins(Pin& tx, Pin& rx)
 int NRF52Serial::putc(char c)
 {
     int res = DEVICE_OK;
+    uint32_t spin = 0;
 
-    while(!target_get_irq_disabled() && is_tx_in_progress_);
+    while(!target_get_irq_disabled() && is_tx_in_progress_)
+    {
+        // TX watchdog: if the UARTE IRQ has not cleared the in-flight flag within
+        // ~300ms, force-STOPTX so a wedged transfer cannot hang the whole system.
+        if (++spin > 2000000)
+        {
+#if DEVICE_DMESG_BUFFER_SIZE > 0
+            // Log the first recovery and subsequent ones at powers of two, so a
+            // persistent wedge cannot flood the DMESG buffer.
+            if (++txWatchdogCount == 1 || (txWatchdogCount & (txWatchdogCount - 1)) == 0)
+                DMESG("NRF52Serial: TX watchdog fired (%d times)", (uint32_t)txWatchdogCount);
+#endif
+            spin = 0;
+            nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STOPTX);
+            uint32_t w = 0;
+            while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED) && ++w < 2000000)
+            {}
+            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDTX);
+            nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
+            is_tx_in_progress_ = false;
+        }
+    }
 
     if(target_get_irq_disabled()){
+        // Robust polled path (works at any IRQ priority, e.g. inside the SD fault
+        // handler): make sure no DMA transfer is in flight before reprogramming it.
+        nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STOPTX);
+        uint32_t w = 0;
+        while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED) && ++w < 2000000)
+        {}
         nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_ENDTX);
         nrf_uarte_event_clear(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
     }
@@ -241,19 +273,21 @@ int NRF52Serial::putc(char c)
     if(target_get_irq_disabled()){
         bool endtx;
         bool txstopped;
+        uint32_t w = 0;
         do
         {
             endtx     = nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_ENDTX);
             txstopped = nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED);
         }
-        while ((!endtx) && (!txstopped));
+        while ((!endtx) && (!txstopped) && ++w < 2000000);
         if (txstopped){
             res = DEVICE_INVALID_STATE;
         }else{
             // Transmitter has to be stopped by triggering the STOPTX task to achieve
             // the lowest possible level of the UARTE power consumption.
             nrf_uarte_task_trigger(p_uarte_, NRF_UARTE_TASK_STOPTX);
-            while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED))
+            w = 0;
+            while(!nrf_uarte_event_check(p_uarte_, NRF_UARTE_EVENT_TXSTOPPED) && ++w < 2000000)
             {}
         }
         is_tx_in_progress_ = false;
