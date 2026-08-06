@@ -62,7 +62,7 @@ public:
      *
      * @return reference to the Resource Manager instance
      */
-    NRF52ResourceManager &resourceManager();
+    static NRF52ResourceManager &get();
 
     /*
      * Request a PWM driver from the Resource Manager

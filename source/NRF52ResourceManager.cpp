@@ -18,7 +18,9 @@ const PwmIrqMapEntry PWM_IRQ_MAP[NRF52PWM_PWM_PERIPHERALS] = {
     {NRF_PWM2, PWM2_IRQn},
 };
 
-NRF52ResourceManager &NRF52ResourceManager::resourceManager()
+NRF52ResourceManager NRF52ResourceManager::_resourceManager;
+
+NRF52ResourceManager &NRF52ResourceManager::get()
 {
     return NRF52ResourceManager::_resourceManager;
 }
@@ -77,3 +79,5 @@ ResourceResult NRF52ResourceManager::pwmRelease(NRF52PWM *&pwm)
     pwmDrivers[pwmIndex] = NULL;
     return OK;
 }
+
+NRF52ResourceManager::NRF52ResourceManager() {}
