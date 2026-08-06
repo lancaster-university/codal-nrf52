@@ -36,6 +36,7 @@ DEALINGS IN THE SOFTWARE.
 #include "EventModel.h"
 #include "codal_target_hal.h"
 #include "NotifyEvents.h"
+#include "NRF52ResourceManager.h"
 
 
 using namespace codal;
@@ -325,7 +326,11 @@ int NRF52Pin::initialisePWM()
 
     if (pwm == NULL)
     {
-        pwm = new NRF52PWM(NRF_PWM0, *pwmSource, 50);
+        ResourceResult result = NRF52ResourceManager::get().pwmAcquire(pwm, LOW, *pwmSource, 50);
+        if (result != OK)
+        {
+            while (true) {}
+        }
         pwm->setStreamingMode(false);
     }
 

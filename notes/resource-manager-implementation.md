@@ -45,9 +45,14 @@ While implementing the logic for acquiring and releasing PWM peripherals I reali
 In order to make the allocation of peripherals dynamic, it is necessary that a mapping exists to map the correct peripheral to its IRQn.
 I've decided to do this on a per-peripheral type basis, so there is a PWM_IRQ_MAP and I will add others for other peripheral types.
 
+## Implementation
 ### PWM releasing
 I've realised that the release of a PWM peripheral is quite convoluted.
 The NRF52PWM class routes and enables the interrupt on construction, but it's up to the holder of the driver to disable the interrupt when they're done. They're also responsible for disconnecting any connected pins and disabling the peripheral before deleting the driver.
 To make matters more complicated, PWM peripherals can have up to four connected pins, pins can only be disconnected one at a time by passing the name of the pin to the `disconnect()` or `release()` function, and there is a `deleteOnRelease` flag in the class, which if set (done as an argument in `connect()`) immediately deletes the instance.
 Disabling the interrupt automatically during the release is trivial, however disconnecting any pins would have to be done by the holder of the driver before they called release.
 This could be fixed by adding a `disconnectAllPins` method to the PWM class, however in the interests of not changing too many things at the same time I will leave this up to the caller for now.
+
+### Test integration
+Having written the logic for PWM management, my next step is to attempt to integrate it into the current codebase to see if it will at least replicate the expected behaviour.
+There are currently three places where the NRF52PWM driver is used: MicroBitAudio, NRF52Pin and neopixel.
