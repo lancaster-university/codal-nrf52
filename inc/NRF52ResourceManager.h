@@ -26,7 +26,6 @@ DEALINGS IN THE SOFTWARE.
 #define NRF52_RESOURCE_MANAGER
 
 #include "NRF52PWM.h"
-#include <memory>
 
 namespace codal
 {
@@ -86,7 +85,7 @@ public:
      *
      * @return Result indicating whether acquisition was a success
      */
-    ResourceResult pwmAcquire(std::unique_ptr<NRF52PWM> &pwm, InterruptPriority const priority,
+    ResourceResult pwmAcquire(NRF52PWM *&pwm, InterruptPriority const priority,
                               DataSource const &source,
                               float const sampleRate = NRF52PWM_DEFAULT_FREQUENCY,
                               uint16_t const id = DEVICE_ID_SYSTEM_DAC);
@@ -98,7 +97,7 @@ public:
      *
      * @param[in,out] pwm The driver to be released
      */
-    void pwmRelease(std::unique_ptr<NRF52PWM> pwm);
+    void pwmRelease(NRF52PWM *&pwm);
 };
 } // namespace codal
 
