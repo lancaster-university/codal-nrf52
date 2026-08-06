@@ -75,15 +75,14 @@ public:
 
     /*
      * Request a PWM driver from the Resource Manager
-     * The PWM driver is wrapped in a unique_ptr to make sure there is only ever one owner.
      *
-     * @param[out] pwm       Variable to be populated with driver pointer if available
+     * @param[out] pwm        Pointer to be populated with driver if available
      * @param[in]  priority   The interrupt priority for this PWM's interrupt
      * @param[in]  source     The DataSource which will provide data to the PWM
      * @param[in]  sampleRate The frequency (in Hz) at which data will be sampled
      * @param[in]  id         Device id used to identify events from this device on the message bus
      *
-     * @return Result indicating whether acquisition was a success
+     * @return Enum representing the result of the acquisition request
      */
     ResourceResult pwmAcquire(NRF52PWM *&pwm, InterruptPriority const priority,
                               DataSource const &source,
@@ -92,8 +91,7 @@ public:
 
     /*
      * Release a PWM driver back to the Resource Manager to be reused.
-     * As the unique pointer is passed by value, it will be inaccessible to the caller after the
-     * function returns.
+     * This function will set `pwm` to NULL so the driver can no longer be used
      *
      * @param[in,out] pwm The driver to be released
      */
