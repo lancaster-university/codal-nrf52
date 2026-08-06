@@ -52,15 +52,6 @@ enum ResourceResult
 
 class NRF52ResourceManager : public CodalComponent
 {
-private:
-    /*
-     * Private constructor: The resource manager is instantiated as a static and accessed through
-     * the public `resourceManager()` function
-     */
-    NRF52ResourceManager();
-
-    static NRF52ResourceManager _resourceManager;
-
 public:
     /*
      * The Resource Manager manages access to the hardware peripherals, making sure that each
@@ -84,8 +75,7 @@ public:
      *
      * @return Enum representing the result of the acquisition request
      */
-    ResourceResult pwmAcquire(NRF52PWM *&pwm, InterruptPriority const priority,
-                              DataSource const &source,
+    ResourceResult pwmAcquire(NRF52PWM *&pwm, InterruptPriority const priority, DataSource &source,
                               float const sampleRate = NRF52PWM_DEFAULT_FREQUENCY,
                               uint16_t const id = DEVICE_ID_SYSTEM_DAC);
 
@@ -94,8 +84,21 @@ public:
      * This function will set `pwm` to NULL so the driver can no longer be used
      *
      * @param[in,out] pwm The driver to be released
+     *
+     * @return Enum representing the result of the release request
      */
-    void pwmRelease(NRF52PWM *&pwm);
+    ResourceResult pwmRelease(NRF52PWM *&pwm);
+
+private:
+    /*
+     * Private constructor: The resource manager is instantiated as a static and accessed through
+     * the public `resourceManager()` function
+     */
+    NRF52ResourceManager();
+
+    static NRF52ResourceManager _resourceManager;
+
+    NRF52PWM *pwmDrivers[NRF52PWM_PWM_PERIPHERALS] = {NULL};
 };
 } // namespace codal
 

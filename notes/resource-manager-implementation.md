@@ -26,6 +26,8 @@ This does provide some safety - it prevents direct use-after-free of the initial
 
 C++ does provide the `std::unique_ptr` type, which has the benefit of preventing copying. Taking the `unique_ptr` by value in the release function guarantees that the variable it was previously stored in is now `nullptr`.
 
+After trying out the `unique_ptr` style I've decided to go back to the raw pointers - the copy protection is not worth littering the code with `std::unique_ptr<TypeName>` everywhere.
+
 ### PWM configuration
 After some consideration, I decided to include the interrupt priority in the set of configuration arguments for the `pwmAcquire()` function.
 Currently, the PWM interrupt priorities are set in `MicroBit::init()`, which works if specific PWMs are designated for specific purposes, but no longer makes sense if PWMs are provided on an "as required" basis.
@@ -37,3 +39,15 @@ In this situation, there needs to be some indication to the caller that they did
 It's possible to just return `nullptr`, however this doesn't give any insight into the reason for the failure.
 As an example, another failure mode might be invalid arguments.
 To address this, I've opted to require a reference from the caller to populate with the driver pointer, and for the acquire function to return an enum representing the result of the call.
+
+### Peripheral - IRQ mapping
+While implementing the logic for acquiring and releasing PWM peripherals I realised that there is no programmatic link between the peripheral and its IRQ.
+In order to make the allocation of peripherals dynamic, it is necessary that a mapping exists to map the correct peripheral to its IRQn.
+I've decided to do this on a per-peripheral type basis, so there is a PWM_IRQ_MAP and I will add others for other peripheral types.
+
+### PWM releasing
+I've realised that the release of a PWM peripheral is quite convoluted.
+The NRF52PWM class routes and enables the interrupt on construction, but it's up to the holder of the driver to disable the interrupt when they're done. They're also responsible for disconnecting any connected pins and disabling the peripheral before deleting the driver.
+To make matters more complicated, PWM peripherals can have up to four connected pins, pins can only be disconnected one at a time by passing the name of the pin to the `disconnect()` or `release()` function, and there is a `deleteOnRelease` flag in the class, which if set (done as an argument in `connect()`) immediately deletes the instance.
+Disabling the interrupt automatically during the release is trivial, however disconnecting any pins would have to be done by the holder of the driver before they called release.
+This could be fixed by adding a `disconnectAllPins` method to the PWM class, however in the interests of not changing too many things at the same time I will leave this up to the caller for now.
