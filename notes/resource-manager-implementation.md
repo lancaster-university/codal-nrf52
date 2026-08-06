@@ -30,3 +30,10 @@ C++ does provide the `std::unique_ptr` type, which has the benefit of preventing
 After some consideration, I decided to include the interrupt priority in the set of configuration arguments for the `pwmAcquire()` function.
 Currently, the PWM interrupt priorities are set in `MicroBit::init()`, which works if specific PWMs are designated for specific purposes, but no longer makes sense if PWMs are provided on an "as required" basis.
 This does mean that we lose the clear comparison between the priorities in the `MicroBit::init()` function, however this could be addressed by `#define`ing priorities for the various components which use these peripherals within a config header.
+
+### Failure handling
+With a finite number of available peripherals, it's possible that a call to `acquire()` could fail.
+In this situation, there needs to be some indication to the caller that they didn't get what they asked for.
+It's possible to just return `nullptr`, however this doesn't give any insight into the reason for the failure.
+As an example, another failure mode might be invalid arguments.
+To address this, I've opted to require a reference from the caller to populate with the driver pointer, and for the acquire function to return an enum representing the result of the call.

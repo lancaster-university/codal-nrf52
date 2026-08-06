@@ -44,6 +44,13 @@ enum InterruptPriority
     LOWEST = 7
 };
 
+enum ResourceResult
+{
+    OK,
+    INVALID_ARGUMENTS,
+    NO_PERIPHERAL_AVAILABLE,
+};
+
 class NRF52ResourceManager : public CodalComponent
 {
 private:
@@ -71,16 +78,18 @@ public:
      * Request a PWM driver from the Resource Manager
      * The PWM driver is wrapped in a unique_ptr to make sure there is only ever one owner.
      *
-     * @param[in] priority The interrupt priority for this PWM's interrupt
-     * @param[in] source   The DataSource which will provide data to the PWM
-     * @param[in] sampleRate The frequency (in Hz) at which data will be sampled
-     * @param[in] id         Device id used to identify events from this device on the message bus
+     * @param[out] pwm       Variable to be populated with driver pointer if available
+     * @param[in]  priority   The interrupt priority for this PWM's interrupt
+     * @param[in]  source     The DataSource which will provide data to the PWM
+     * @param[in]  sampleRate The frequency (in Hz) at which data will be sampled
+     * @param[in]  id         Device id used to identify events from this device on the message bus
      *
-     * @return Unique pointer wrapping the PWM driver
+     * @return Result indicating whether acquisition was a success
      */
-    std::unique_ptr<NRF52PWM> pwmAcquire(InterruptPriority priority, DataSource &source,
-                                         float sampleRate = NRF52PWM_DEFAULT_FREQUENCY,
-                                         uint16_t id = DEVICE_ID_SYSTEM_DAC);
+    ResourceResult pwmAcquire(std::unique_ptr<NRF52PWM> &pwm, InterruptPriority const priority,
+                              DataSource const &source,
+                              float const sampleRate = NRF52PWM_DEFAULT_FREQUENCY,
+                              uint16_t const id = DEVICE_ID_SYSTEM_DAC);
 
     /*
      * Release a PWM driver back to the Resource Manager to be reused.
