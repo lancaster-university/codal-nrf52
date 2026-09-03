@@ -77,7 +77,7 @@ namespace codal
         virtual int getFormat();
 
         /*
-         * Allow out downstream component to register itself with us
+         * Allow our downstream component to register itself with us
          */
         virtual void connect(DataSink &sink);
 
@@ -94,7 +94,7 @@ namespace codal
         int setBufferSize(int size);
 
         /**
-         * Perform a blocking playout of the given 24 bit RGB/GRB encoded datastream. Thhis method performs no
+         * Perform a blocking playout of the given 24 bit RGB/GRB encoded datastream. This method performs no
          * ordering of red/green/blue elements - it simply clocks out the data in the order provided.
          * @param data pointer to the RGB buffer to playout
          * @param length number of bytes in the buffer
@@ -102,14 +102,14 @@ namespace codal
         void play(const void *data, int length);
 
         /**
-         * Perform a blocking playout of the given 24 bit RGB/GRB encoded datastream. Thhis method performs no
+         * Perform a blocking playout of the given 24 bit RGB/GRB encoded datastream. This method performs no
          * ordering of red/green/blue elements - it simply clocks out the data in the order provided.
          * @param b the RGB buffer to playout
          */
         void play(ManagedBuffer b);
 
         /**
-         * Perform a non-blocking playout of the given 24 bit RGB/GRB encoded datastream. Thhis method performs no
+         * Perform a non-blocking playout of the given 24 bit RGB/GRB encoded datastream. This method performs no
          * ordering of red/green/blue elements - it simply clocks out the data in the order provided.
          * @param data pointer to the RGB buffer to playout
          * @param length number of bytes in the buffer
@@ -117,7 +117,7 @@ namespace codal
         void playAsync(const void *data, int length);
 
         /**
-         * Perform a non-blocking playout of the given 24 bit RGB/GRB encoded datastream. Thhis method performs no
+         * Perform a non-blocking playout of the given 24 bit RGB/GRB encoded datastream. This method performs no
          * ordering of red/green/blue elements - it simply clocks out the data in the order provided.
          * @param b the RGB buffer to playout
          */
