@@ -76,7 +76,7 @@ class NRF52RadioDatagram
     int recv(uint8_t *buf, int len);
 
     /**
-      * Retreives packet payload data into the given buffer.
+      * Retrieves packet payload data into the given buffer.
       *
       * If a data packet is already available, then it will be returned immediately to the caller
       * in the form of a ManagedBuffer.
@@ -129,7 +129,7 @@ class NRF52RadioDatagram
     /**
       * Protocol handler callback. This is called when the radio receives a packet marked as a datagram.
       *
-      * This function process this packet, and queues it for user reception.
+      * This function processes this packet, and queues it for user reception.
       */
     void packetReceived();
 };

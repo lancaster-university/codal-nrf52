@@ -37,8 +37,8 @@ private:
     float           sampleRate;
     float           periodUs;               // Period between output samples, in microseconds
     uint8_t         bufferPlaying;          // ID of the buffer currently being played (0 or 1). Output is hardware double buffered.
-    int8_t          stopStreamingAfterBuf;  // When stopping, the last buffer ID to play beforhand. -1 if no stop is scheduled.
-    ManagedBuffer   buffer[2];              // The ManagedBuffers currently being used by the PWN hardware
+    int8_t          stopStreamingAfterBuf;  // When stopping, the last buffer ID to play beforehand. -1 if no stop is scheduled.
+    ManagedBuffer   buffer[2];              // The ManagedBuffers currently being used by the PWM hardware
 
 public:
 
@@ -71,7 +71,7 @@ public:
     float getSampleRate();
 
     /**
-     * Determine the maximum unsigned vlaue that can be loaded into the PWM data values, for the current
+     * Determine the maximum unsigned value that can be loaded into the PWM data values, for the current
      * frequency configuration.
      */
     int getSampleRange();
@@ -104,7 +104,7 @@ public:
      * PWM_DECODER_LOAD_Individual      1st half word (16-bit) in ch.0; 2nd in ch.1; ...; 4th in ch.3 
      * PWM_DECODER_LOAD_WaveForm        1st half word (16-bit) in ch.0; 2nd in ch.1; ...; 4th in COUNTERTOP
      * 
-     * (See nrf52 product specificaiton for more details)
+     * (See nrf52 product specification for more details)
      * 
      * @param mode The mode for this PWM module to use.
      * @return DEVICE_OK, or DEVICE_INVALID_PARAMETER.
@@ -114,8 +114,8 @@ public:
     /**
      * Defines if the PWM module should maintain playout ordering of buffers, or always play the most recent buffer provided.
      * 
-     * @ param streamingMode If true, buffers will be streamed in order they are received. If false, the most recent buffer supplied always takes prescedence.
-     * @ param repeatOnEmpty If set to true, the last buffer received will be repeated when no data is available. If false, the PWM channel will be suspended.
+     * @param streamingMode If true, buffers will be streamed in order they are received. If false, the most recent buffer supplied always takes precedence.
+     * @param repeatOnEmpty If set to true, the last buffer received will be repeated when no data is available. If false, the PWM channel will be suspended.
      */
     void setStreamingMode(bool streamingMode, bool repeatOnEmpty = true);
 
@@ -142,7 +142,7 @@ public:
 
    /**
     * Method to release the given pin from a peripheral, if already bound.
-    * Device drivers should override this method to disconnect themselves from the give pin
+    * Device drivers should override this method to disconnect themselves from the given pin
     * to allow it to be used by a different peripheral.
     *
     * @param pin the Pin to be released

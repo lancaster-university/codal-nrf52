@@ -100,7 +100,7 @@ public:
      * The CPU will busy wait until the transmission is complete.
      *
      * @param data The data to write.
-     * @return Response from the SPI slave or DEVICE_SPI_ERROR if the the write request failed.
+     * @return Response from the SPI slave or DEVICE_SPI_ERROR if the write request failed.
      */
     virtual int write(int data);
 
@@ -121,7 +121,7 @@ public:
                          uint32_t rxSize, PVoidCallback doneHandler, void *arg);
 
     /**
-      * Change the pins used by this I2C peripheral to those provided.
+      * Change the pins used by this SPI peripheral to those provided.
       *
       * @param mosi the Pin to use for the SPI input line.
       * @param miso the Pin to use for the SPI output line.

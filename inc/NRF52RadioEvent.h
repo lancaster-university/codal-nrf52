@@ -131,7 +131,7 @@ class NRF52RadioEvent
     /**
       * Protocol handler callback. This is called when the radio receives a packet marked as using the event protocol.
       *
-      * This function process this packet, and fires the event contained inside onto the default EventModel.
+      * This function processes this packet, and fires the event contained inside onto the default EventModel.
       */
     void packetReceived();
 
