@@ -73,6 +73,28 @@ void target_disable_irqn(int32_t irqn)
     // this used to disable here, only if irq_disabled==1 - this was a race
 }
 
+// Mask application interrupts (NVIC priorities 1-7) but leave priority 0 (the
+// SoftDevice's radio/timer IRQs) live, so heap searches and fiber creation can
+// never delay the SD radio arming deadline. The heap allocator and the fiber
+// scheduler use this through the target_lock_app_irqs() HAL.
+//
+// BASEPRI compares against the priority in the top __NVIC_PRIO_BITS bits; the
+// unimplemented low bits read as zero, so a bare 1 reads back as 0 and masks
+// nothing. Shift priority 1 into place instead.
+uint32_t target_lock_app_irqs()
+{
+    uint32_t basepri;
+
+    __asm volatile ("MRS %0, basepri" : "=r" (basepri));
+    __asm volatile ("MSR basepri, %0" : : "r" (1u << (8 - __NVIC_PRIO_BITS)) : "memory");
+    return basepri;
+}
+
+void target_unlock_app_irqs(uint32_t state)
+{
+    __asm volatile ("MSR basepri, %0" : : "r" (state) : "memory");
+}
+
 void target_wait_for_event()
 {
     __WFE();
