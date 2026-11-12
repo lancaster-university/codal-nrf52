@@ -6,6 +6,7 @@
 #include "CodalComponent.h"
 #include "CodalConfig.h"
 #include "Serial.h"
+#include "NRF52SerialBase.h"
 #include "hal/nrf_uarte.h"
 
 #ifndef CONFIG_SERIAL_DMA_BUFFER_SIZE
@@ -14,9 +15,13 @@
 
 namespace codal
 {
-    class NRF52Serial : public Serial
+    /**
+     * The serial port on UARTE, driven through EasyDMA.
+     *
+     * See NRF52SerialUART for the UART0 variant that receives without DMA.
+     */
+    class NRF52Serial : public NRF52SerialBase
     {
-        volatile bool is_tx_in_progress_;
         volatile int  bytesProcessed;
 #if DEVICE_DMESG_BUFFER_SIZE > 0
         volatile uint32_t txWatchdogCount;
@@ -24,7 +29,6 @@ namespace codal
         uint8_t dmaBuffer[CONFIG_SERIAL_DMA_BUFFER_SIZE];
 
         NRF_UARTE_Type *p_uarte_;
-        static void _irqHandler(void *self);
 
         /**
          * Ensures all characters have been processed once a DMA buffer is fully received.
@@ -55,9 +59,10 @@ namespace codal
         void dataReceivedDMA();        
 
         protected:
+        virtual void handleIrq() override;
+        virtual void setTxRxPins(Pin& tx, Pin& rx) override;
         virtual int enableInterrupt(SerialInterruptType t) override;
         virtual int disableInterrupt(SerialInterruptType t) override;
-        virtual int configurePins(Pin& tx, Pin& rx) override;
 
         public:
 
@@ -72,13 +77,7 @@ namespace codal
         NRF52Serial(Pin& tx, Pin& rx, NRF_UARTE_Type* device = NULL);
 
         virtual int putc(char) override;
-        virtual int getc() override;
         virtual int setBaudrate(uint32_t baudrate) override;
-
-        /**
-          * Puts the component in (or out of) sleep (low power) mode.
-          */
-        virtual int setSleep(bool doSleep) override;
 
         ~NRF52Serial();
     };
