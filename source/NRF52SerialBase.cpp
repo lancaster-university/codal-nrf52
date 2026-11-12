@@ -29,6 +29,9 @@ void NRF52SerialBase::initIrq()
 
     IRQn_Type IRQn = get_alloc_peri_irqn(p_peri_);
 
+    // Priority 1 keeps the radio (priority 0) above these handlers, but the
+    // heap and fiber critical sections mask priorities 1-7 and can hold them
+    // off. See NRF52SerialUART for what that means for reception.
     NVIC_SetPriority(IRQn, 1);
     NVIC_ClearPendingIRQ(IRQn);
     NVIC_EnableIRQ(IRQn);

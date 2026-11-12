@@ -18,7 +18,16 @@ namespace codal
     /**
      * The serial port on UARTE, driven through EasyDMA.
      *
-     * See NRF52SerialUART for the UART0 variant that receives without DMA.
+     * EasyDMA costs one interrupt per buffer instead of one per byte, which
+     * keeps the CPU and the SoftDevice happy at high baud rates. The price is
+     * that RX progress is only reported at ENDRX: RXDRDY is a single flag, so
+     * a delayed interrupt cannot tell how many bytes the DMA has already
+     * written. A heap search or a fiber creation masks application interrupts
+     * for a long time (see NRF52SerialUART), and the tail of a line then waits
+     * in the DMA buffer until the buffer fills.
+     *
+     * Use NRF52SerialUART for a console, and this class where throughput
+     * matters, or for a second port on UARTE1.
      */
     class NRF52Serial : public NRF52SerialBase
     {
